@@ -45,14 +45,15 @@ management:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:dev-only-secret-change-me-9f4b2d7c1a8e6f3b5c0d9e2a7f4b1c8d6e3a0f9b2c5d8e1f4a7b0c3d6e9f2a5b}
+    # Required in production. The local and test profiles supply a development-only fallback.
+    secret: ${JWT_SECRET:}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
     issuer: garment-erp
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:4173}
   uploads-dir: ${UPLOADS_DIR:./data/uploads}
   backups-dir: ${BACKUPS_DIR:./data/backups}
-  demo-data: ${DEMO_DATA:true}
+  demo-data: ${DEMO_DATA:false}
   seed-password: ${SEED_PASSWORD:Retail@123}
   notification:
     whatsapp:
@@ -112,6 +113,11 @@ spring:
   flyway:
     enabled: false
 
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-9f4b2d7c1a8e6f3b5c0d9e2a7f4b1c8d6e3a0f9b2c5d8e1f4a7b0c3d6e9f2a5b}
+  demo-data: ${DEMO_DATA:true}
+
 ---
 spring:
   config:
@@ -129,6 +135,8 @@ spring:
     enabled: false
 
 app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-9f4b2d7c1a8e6f3b5c0d9e2a7f4b1c8d6e3a0f9b2c5d8e1f4a7b0c3d6e9f2a5b}
   demo-data: false
   backup:
     enabled: false
@@ -153,3 +161,27 @@ spring:
     enabled: true
     baseline-on-migrate: false
     locations: classpath:db/migration
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  h2:
+    console:
+      enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  jwt:
+    # Fail fast: production must provide a strong, unique secret.
+    secret: ${JWT_SECRET}
+  cors:
+    # Fail fast: production must declare the allowed frontend origin(s).
+    allowed-origins: ${CORS_ORIGINS}
+  demo-data: false

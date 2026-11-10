@@ -4,6 +4,7 @@ import com.garmentshop.erp.config.AppProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -15,14 +16,20 @@ import java.util.Date;
 @Service
 public class JwtService {
 
+    private static final String DEV_SECRET_PREFIX = "dev-only-secret-change-me";
+
     private final SecretKey key;
     private final long expirationMinutes;
     private final String issuer;
 
-    public JwtService(AppProperties properties) {
+    public JwtService(AppProperties properties, Environment environment) {
         String secret = properties.jwt().secret();
         if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("JWT_SECRET must be at least 32 bytes. Configure a strong secret.");
+        }
+        if (environment.matchesProfiles("prod") && secret.startsWith(DEV_SECRET_PREFIX)) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must be a unique production secret. Refusing to start with the development default.");
         }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMinutes = properties.jwt().expirationMinutes();

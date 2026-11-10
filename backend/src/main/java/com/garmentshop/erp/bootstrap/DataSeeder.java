@@ -58,6 +58,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,6 +84,7 @@ public class DataSeeder implements ApplicationRunner {
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     private final AppProperties appProperties;
+    private final Environment environment;
     private final PasswordEncoder passwordEncoder;
     private final PermissionRepository permissionRepository;
     private final RoleRepository roleRepository;
@@ -127,7 +129,11 @@ public class DataSeeder implements ApplicationRunner {
             return;
         }
         if (appProperties.demoData()) {
-            log.info("Seeding demo garment shop data");
+            if (environment.matchesProfiles("prod")) {
+                throw new IllegalStateException("Demo data seeding is disabled in the prod profile. Set DEMO_DATA=false.");
+            }
+            log.warn("Seeding demo garment shop data with default demo credentials. "
+                    + "Never enable demo data in production — set DEMO_DATA=false.");
             seedDemo();
         } else {
             log.info("Seeding bootstrap business and owner account");

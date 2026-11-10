@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BadgeIndianRupee,
   Boxes,
@@ -15,7 +15,9 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  ReceiptText,
   RefreshCw,
+  RotateCcw,
   ScanBarcode,
   Settings2,
   Shirt,
@@ -26,7 +28,9 @@ import {
   Wifi,
   X
 } from 'lucide-react'
+import { api, qs } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import type { SalesReturn } from '../lib/types'
 import { cn, IconButton } from './ui'
 import { formatDate, initials, todayISO } from '../lib/format'
 
@@ -48,6 +52,14 @@ const groups: NavGroup[] = [
   {
     label: 'Overview',
     items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, permissions: ['dashboard.view'] }]
+  },
+  {
+    label: 'Sell',
+    items: [
+      { to: '/pos', label: 'POS billing', icon: ScanBarcode, permissions: ['pos.bill'] },
+      { to: '/sales', label: 'Sales', icon: ReceiptText, permissions: ['invoice.view', 'pos.bill'], any: true },
+      { to: '/returns', label: 'Returns', icon: RotateCcw, permissions: ['pos.return', 'invoice.view'], any: true }
+    ]
   },
   {
     label: 'Stock',
@@ -98,6 +110,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+
+  const pendingReturnsQuery = useQuery({
+    queryKey: ['returns', branchId, 'PENDING'],
+    queryFn: () => api<SalesReturn[]>(`/api/returns${qs({ branchId, status: 'PENDING' })}`),
+    enabled: Boolean(branchId) && has('return.approve'),
+    retry: false,
+    refetchInterval: 60_000,
+    staleTime: 30_000
+  })
+  const pendingReturnCount = pendingReturnsQuery.data?.length ?? 0
 
   const toggleSidebar = useCallback(() => {
     setCollapsed((value) => {
@@ -230,6 +252,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
                         />
                         <item.icon size={15} strokeWidth={isActive ? 2.1 : 1.8} className={isActive ? 'text-saffron-400' : 'text-ivory-200/40 group-hover:text-ivory-200/70'} />
                         {item.label}
+                        {item.to === '/returns' && pendingReturnCount > 0 && (
+                          <span className="ml-auto min-w-[18px] rounded-full bg-saffron-400 px-1.5 py-0.5 text-center text-[9.5px] font-bold leading-none text-ink-900">
+                            {pendingReturnCount}
+                          </span>
+                        )}
                       </>
                     )}
                   </NavLink>
