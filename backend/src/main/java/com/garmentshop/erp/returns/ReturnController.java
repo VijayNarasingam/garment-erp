@@ -1,5 +1,6 @@
 package com.garmentshop.erp.returns;
 
+import com.garmentshop.erp.common.PageResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,8 +12,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/returns")
 @RequiredArgsConstructor
@@ -22,9 +21,18 @@ public class ReturnController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('pos.return') or hasAuthority('invoice.view')")
-    public List<ReturnDtos.ReturnResponse> list(@RequestParam(required = false) Long branchId,
-                                                @RequestParam(required = false) String status) {
-        return returnService.list(branchId, status);
+    public PageResponse<ReturnDtos.ReturnResponse> list(@RequestParam(required = false) Long branchId,
+                                                        @RequestParam(required = false) String status,
+                                                        @RequestParam(required = false) String q,
+                                                        @RequestParam(defaultValue = "0") int page,
+                                                        @RequestParam(defaultValue = "25") int size) {
+        return returnService.list(branchId, status, q, page, size);
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasAuthority('pos.return') or hasAuthority('invoice.view')")
+    public ReturnDtos.ReturnSummary summary(@RequestParam(required = false) Long branchId) {
+        return returnService.summary(branchId);
     }
 
     @GetMapping("/{id}")

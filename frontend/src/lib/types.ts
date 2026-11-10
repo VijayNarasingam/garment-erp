@@ -567,6 +567,16 @@ export interface SalesReturn {
   items: ReturnItem[]
 }
 
+export interface ReturnSummary {
+  total: number
+  pending: number
+  approved: number
+  completed: number
+  rejected: number
+  cancelled: number
+  completedValue: number
+}
+
 export interface ExpenseCategory {
   id: number
   name: string

@@ -1,6 +1,7 @@
 package com.garmentshop.erp.repository;
 
 import com.garmentshop.erp.domain.Payment;
+import com.garmentshop.erp.domain.PaymentMethod;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +18,14 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     boolean existsByOfflineId(String offlineId);
 
     List<Payment> findByInvoiceIdAndStatusOrderByIdAsc(Long invoiceId, String status);
+
+    @Query("""
+            select distinct p.method from Payment p
+            where p.invoice.id = :invoiceId and p.status = 'POSTED'
+              and p.type = com.garmentshop.erp.domain.PaymentType.CUSTOMER_RECEIPT
+              and p.method <> com.garmentshop.erp.domain.PaymentMethod.EXCHANGE
+            """)
+    List<PaymentMethod> findOriginalReceiptMethods(@Param("invoiceId") Long invoiceId);
 
     @Query("""
             select coalesce(sum(p.amount), 0) from Payment p

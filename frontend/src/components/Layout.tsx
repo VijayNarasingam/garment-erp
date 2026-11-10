@@ -30,7 +30,7 @@ import {
 } from 'lucide-react'
 import { api, qs } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import type { SalesReturn } from '../lib/types'
+import type { PageResponse, SalesReturn } from '../lib/types'
 import { cn, IconButton } from './ui'
 import { formatDate, initials, todayISO } from '../lib/format'
 
@@ -113,13 +113,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   const pendingReturnsQuery = useQuery({
     queryKey: ['returns', branchId, 'PENDING'],
-    queryFn: () => api<SalesReturn[]>(`/api/returns${qs({ branchId, status: 'PENDING' })}`),
+    queryFn: () => api<PageResponse<SalesReturn>>(`/api/returns${qs({ branchId, status: 'PENDING', page: 0, size: 1 })}`),
     enabled: Boolean(branchId) && has('return.approve'),
     retry: false,
     refetchInterval: 60_000,
     staleTime: 30_000
   })
-  const pendingReturnCount = pendingReturnsQuery.data?.length ?? 0
+  const pendingReturnCount = pendingReturnsQuery.data?.totalElements ?? 0
 
   const toggleSidebar = useCallback(() => {
     setCollapsed((value) => {

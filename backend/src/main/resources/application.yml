@@ -51,6 +51,10 @@ app:
     issuer: garment-erp
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:4173}
+  security:
+    login-rate-limit:
+      max-attempts: ${LOGIN_RATE_LIMIT_MAX:30}
+      window-seconds: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:300}
   uploads-dir: ${UPLOADS_DIR:./data/uploads}
   backups-dir: ${BACKUPS_DIR:./data/backups}
   demo-data: ${DEMO_DATA:false}

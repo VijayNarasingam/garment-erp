@@ -59,6 +59,10 @@ public final class ReturnDtos {
     public record CancelReturnRequest(@NotBlank @Size(max = 300) String reason) {
     }
 
+    public record ReturnSummary(long total, long pending, long approved, long completed,
+                                long rejected, long cancelled, BigDecimal completedValue) {
+    }
+
     public record ReturnItemResponse(Long id, Long invoiceItemId, Long variantId, String productName, String sku,
                                      int quantity, BigDecimal unitPrice, BigDecimal taxRate,
                                      BigDecimal taxableAmount, BigDecimal taxAmount, BigDecimal lineTotal,

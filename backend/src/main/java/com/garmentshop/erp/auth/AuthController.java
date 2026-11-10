@@ -1,5 +1,7 @@
 package com.garmentshop.erp.auth;
 
+import com.garmentshop.erp.security.LoginRateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,9 +20,12 @@ import java.util.List;
 public class AuthController {
 
     private final AuthService authService;
+    private final LoginRateLimiter loginRateLimiter;
 
     @PostMapping("/login")
-    public AuthDtos.LoginResponse login(@Valid @RequestBody AuthDtos.LoginRequest request) {
+    public AuthDtos.LoginResponse login(@Valid @RequestBody AuthDtos.LoginRequest request,
+                                        HttpServletRequest httpRequest) {
+        loginRateLimiter.checkAndRecord(httpRequest);
         return authService.login(request);
     }
 

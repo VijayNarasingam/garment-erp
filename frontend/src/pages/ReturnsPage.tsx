@@ -4,7 +4,7 @@ import { ArrowLeftRight, CheckCircle2, PackageCheck, Plus, RefreshCw, RotateCcw,
 import { api, qs } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatDate, money, statusTone, titleCase, todayISO } from '../lib/format'
-import type { Invoice, PageResponse, SalesReturn } from '../lib/types'
+import type { Invoice, PageResponse, ReturnSummary, SalesReturn } from '../lib/types'
 import {
   Badge,
   Button,
@@ -16,6 +16,7 @@ import {
   LoadingBlock,
   Modal,
   PageHeader,
+  Pagination,
   SearchInput,
   Select,
   StatCard,
@@ -43,6 +44,7 @@ export function ReturnsPage() {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
   const [detail, setDetail] = useState<SalesReturn | null>(null)
   const [rejecting, setRejecting] = useState<SalesReturn | null>(null)
@@ -65,8 +67,17 @@ export function ReturnsPage() {
   const [lines, setLines] = useState<ReturnLine[]>([])
 
   const returnsQuery = useQuery({
-    queryKey: ['returns', branchId, status],
-    queryFn: () => api<SalesReturn[]>(`/api/returns${qs({ branchId, status })}`),
+    queryKey: ['returns', branchId, status, search, page],
+    queryFn: () =>
+      api<PageResponse<SalesReturn>>(
+        `/api/returns${qs({ branchId, status, q: search, page, size: 25 })}`
+      ),
+    enabled: branchId != null
+  })
+
+  const summaryQuery = useQuery({
+    queryKey: ['returns-summary', branchId],
+    queryFn: () => api<ReturnSummary>(`/api/returns/summary${qs({ branchId })}`),
     enabled: branchId != null
   })
 
@@ -84,19 +95,11 @@ export function ReturnsPage() {
     [invoicesQuery.data, form.invoiceId]
   )
 
-  const rows = (returnsQuery.data ?? []).filter((item) => {
-    if (!search.trim()) return true
-    const term = search.trim().toLowerCase()
-    return [item.returnNo, item.invoiceNo, item.customerName, item.reason]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(term))
-  })
+  const rows = returnsQuery.data?.content ?? []
 
-  const pendingCount = (returnsQuery.data ?? []).filter((item) => item.status === 'PENDING').length
-  const approvedCount = (returnsQuery.data ?? []).filter((item) => item.status === 'APPROVED').length
-  const completedTotal = (returnsQuery.data ?? [])
-    .filter((item) => item.status === 'COMPLETED')
-    .reduce((sum, item) => sum + Number(item.total || 0), 0)
+  const pendingCount = summaryQuery.data?.pending ?? 0
+  const approvedCount = summaryQuery.data?.approved ?? 0
+  const completedTotal = Number(summaryQuery.data?.completedValue ?? 0)
 
   const openCreate = () => {
     setForm({
@@ -140,6 +143,7 @@ export function ReturnsPage() {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['returns'] })
+    queryClient.invalidateQueries({ queryKey: ['returns-summary'] })
     queryClient.invalidateQueries({ queryKey: ['return-invoices'] })
     queryClient.invalidateQueries({ queryKey: ['invoices'] })
     queryClient.invalidateQueries({ queryKey: ['inventory-stock'] })
@@ -283,21 +287,21 @@ export function ReturnsPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Returns" value={returnsQuery.data?.length ?? 0} hint="In this branch and filter" icon={RotateCcw} tone="accent" />
+        <StatCard label="Returns" value={summaryQuery.data?.total ?? 0} hint="In this branch" icon={RotateCcw} tone="accent" />
         <StatCard label="Awaiting approval" value={pendingCount} hint="Pending manager review" icon={ShieldCheck} tone={pendingCount ? 'warning' : 'neutral'} />
         <StatCard label="Ready to complete" value={approvedCount} hint="Approved, not yet refunded" icon={PackageCheck} tone={approvedCount ? 'info' : 'neutral'} />
-        <StatCard label="Completed value" value={money(completedTotal)} hint="Goods returned this view" icon={CheckCircle2} tone="success" />
+        <StatCard label="Completed value" value={money(completedTotal)} hint="All completed returns in branch" icon={CheckCircle2} tone="success" />
       </div>
 
       <Card className="mt-4 overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-4 py-3">
           <SearchInput
             value={search}
-            onChange={setSearch}
+            onChange={(value) => { setSearch(value); setPage(0) }}
             placeholder="Return no, invoice, customer…"
             className="w-full max-w-sm"
           />
-          <Select value={status} onChange={(event) => setStatus(event.target.value)} className="w-44">
+          <Select value={status} onChange={(event) => { setStatus(event.target.value); setPage(0) }} className="w-44">
             <option value="">All statuses</option>
             {['PENDING', 'APPROVED', 'COMPLETED', 'REJECTED', 'CANCELLED'].map((value) => (
               <option key={value} value={value}>
@@ -306,7 +310,7 @@ export function ReturnsPage() {
             ))}
           </Select>
           <span className="ml-auto text-[11px] text-ink-400">
-            <span className="num font-semibold text-ink-600">{rows.length}</span> returns
+            <span className="num font-semibold text-ink-600">{returnsQuery.data?.totalElements ?? 0}</span> returns
           </span>
         </div>
 
@@ -385,6 +389,12 @@ export function ReturnsPage() {
             </tbody>
           </Table>
         )}
+        <Pagination
+          page={page}
+          totalPages={returnsQuery.data?.totalPages ?? 0}
+          totalElements={returnsQuery.data?.totalElements ?? 0}
+          onChange={setPage}
+        />
       </Card>
 
       <Modal

@@ -5,6 +5,7 @@ import com.garmentshop.erp.audit.AuditService;
 import com.garmentshop.erp.common.ApiException;
 import com.garmentshop.erp.common.FinancialYear;
 import com.garmentshop.erp.common.Money;
+import com.garmentshop.erp.common.PageResponse;
 import com.garmentshop.erp.common.SequenceService;
 import com.garmentshop.erp.domain.Branch;
 import com.garmentshop.erp.domain.Business;
@@ -32,6 +33,8 @@ import com.garmentshop.erp.security.CurrentUserService;
 import com.garmentshop.erp.security.Permissions;
 import com.garmentshop.erp.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +49,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -64,16 +68,46 @@ public class ReturnService {
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
-    public List<ReturnDtos.ReturnResponse> list(Long branchId, String status) {
+    public PageResponse<ReturnDtos.ReturnResponse> list(Long branchId, String status, String search,
+                                                        int page, int size) {
         if (branchId != null) {
             currentUserService.assertBranch(branchId);
         }
         ReturnStatus parsed = status == null || status.isBlank() ? null : parseStatus(status);
-        return returnRepository.findByBusinessIdOrderByIdDesc(currentUserService.businessId()).stream()
-                .filter(r -> branchId == null || r.getBranch().getId().equals(branchId))
-                .filter(r -> parsed == null || r.getStatus() == parsed)
-                .map(this::response)
-                .toList();
+        String term = search == null || search.isBlank() ? null : search.trim();
+        Page<SalesReturn> result = returnRepository.search(currentUserService.businessId(), branchId, parsed, term,
+                PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100)));
+        return PageResponse.of(result, this::response);
+    }
+
+    @Transactional(readOnly = true)
+    public ReturnDtos.ReturnSummary summary(Long branchId) {
+        if (branchId != null) {
+            currentUserService.assertBranch(branchId);
+        }
+        long total = 0;
+        long pending = 0;
+        long approved = 0;
+        long completed = 0;
+        long rejected = 0;
+        long cancelled = 0;
+        BigDecimal completedValue = BigDecimal.ZERO;
+        for (Object[] row : returnRepository.summary(currentUserService.businessId(), branchId)) {
+            ReturnStatus rowStatus = (ReturnStatus) row[0];
+            long count = ((Number) row[1]).longValue();
+            total += count;
+            switch (rowStatus) {
+                case PENDING -> pending = count;
+                case APPROVED -> approved = count;
+                case COMPLETED -> {
+                    completed = count;
+                    completedValue = Money.of((BigDecimal) row[2]);
+                }
+                case REJECTED -> rejected = count;
+                case CANCELLED -> cancelled = count;
+            }
+        }
+        return new ReturnDtos.ReturnSummary(total, pending, approved, completed, rejected, cancelled, completedValue);
     }
 
     @Transactional(readOnly = true)
@@ -341,6 +375,22 @@ public class ReturnService {
             if (refundAmount.compareTo(refundable) > 0) {
                 throw ApiException.badRequest("REFUND_EXCEEDS_PAID",
                         "Refund cannot exceed the paid amount available for refund (" + Money.of(refundable) + ").");
+            }
+        }
+        if (refundAmount.signum() > 0 && business.isRefundToOriginalMethodOnly()
+                && refundMethod != PaymentMethod.ADVANCE) {
+            List<PaymentMethod> originalMethods = paymentRepository.findOriginalReceiptMethods(invoice.getId());
+            if (originalMethods.isEmpty()) {
+                throw ApiException.badRequest("REFUND_METHOD_NOT_ALLOWED",
+                        "This invoice has no original cash payment method to refund to. "
+                                + "Choose ADVANCE to issue store credit instead.");
+            }
+            if (!originalMethods.contains(refundMethod)) {
+                String allowed = originalMethods.stream().map(Enum::name).sorted()
+                        .collect(Collectors.joining(", "));
+                throw ApiException.badRequest("REFUND_METHOD_NOT_ALLOWED",
+                        "This business refunds only to the original payment method (" + allowed
+                                + "). Choose ADVANCE to issue store credit instead.");
             }
         }
 
