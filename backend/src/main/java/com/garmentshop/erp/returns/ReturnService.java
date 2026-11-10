@@ -49,7 +49,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -377,21 +376,8 @@ public class ReturnService {
                         "Refund cannot exceed the paid amount available for refund (" + Money.of(refundable) + ").");
             }
         }
-        if (refundAmount.signum() > 0 && business.isRefundToOriginalMethodOnly()
-                && refundMethod != PaymentMethod.ADVANCE) {
-            List<PaymentMethod> originalMethods = paymentRepository.findOriginalReceiptMethods(invoice.getId());
-            if (originalMethods.isEmpty()) {
-                throw ApiException.badRequest("REFUND_METHOD_NOT_ALLOWED",
-                        "This invoice has no original cash payment method to refund to. "
-                                + "Choose ADVANCE to issue store credit instead.");
-            }
-            if (!originalMethods.contains(refundMethod)) {
-                String allowed = originalMethods.stream().map(Enum::name).sorted()
-                        .collect(Collectors.joining(", "));
-                throw ApiException.badRequest("REFUND_METHOD_NOT_ALLOWED",
-                        "This business refunds only to the original payment method (" + allowed
-                                + "). Choose ADVANCE to issue store credit instead.");
-            }
+        if (RefundPolicy.applies(business.isRefundToOriginalMethodOnly(), refundAmount, refundMethod)) {
+            RefundPolicy.validate(paymentRepository.findOriginalReceiptMethods(invoice.getId()), refundMethod);
         }
 
         for (SalesReturnItem item : salesReturn.getItems()) {

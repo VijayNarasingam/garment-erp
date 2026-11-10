@@ -610,6 +610,12 @@ public class SaleService {
         }
         BigDecimal paid = result.stream().map(PaymentLine::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (paid.compareTo(total) > 0) {
+            boolean hasExchangeCredit = result.stream().anyMatch(payment -> payment.method() == PaymentMethod.EXCHANGE);
+            if (hasExchangeCredit) {
+                throw ApiException.badRequest("EXCHANGE_CREDIT_EXCEEDS_BILL",
+                        "The exchange credit is higher than this bill. Add items worth at least the credit; "
+                                + "refunding the difference is not supported yet.");
+            }
             throw ApiException.badRequest("OVERPAYMENT", "Tendered amount cannot exceed the invoice total.");
         }
         return result;

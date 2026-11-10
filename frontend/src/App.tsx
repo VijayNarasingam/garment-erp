@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { ShieldAlert } from 'lucide-react'
 import { useAuth } from './lib/auth'
@@ -5,21 +6,22 @@ import { AppLayout } from './components/Layout'
 import { BillingLayout } from './components/BillingLayout'
 import { EmptyState, Spinner } from './components/ui'
 import { LoginPage } from './pages/LoginPage'
-import { ModePage } from './pages/ModePage'
-import { DashboardPage } from './pages/DashboardPage'
-import { PosPage } from './pages/PosPage'
-import { SalesPage } from './pages/SalesPage'
-import { InventoryPage } from './pages/InventoryPage'
-import { ProductsPage } from './pages/ProductsPage'
-import { PurchasingPage } from './pages/PurchasingPage'
-import { CustomersPage } from './pages/CustomersPage'
-import { SuppliersPage } from './pages/SuppliersPage'
-import { ReturnsPage } from './pages/ReturnsPage'
-import { ExpensesPage } from './pages/ExpensesPage'
-import { CashPage } from './pages/CashPage'
-import { AccountingPage } from './pages/AccountingPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { SyncPage } from './pages/SyncPage'
+
+const ModePage = lazy(() => import('./pages/ModePage').then((module) => ({ default: module.ModePage })))
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })))
+const PosPage = lazy(() => import('./pages/PosPage').then((module) => ({ default: module.PosPage })))
+const SalesPage = lazy(() => import('./pages/SalesPage').then((module) => ({ default: module.SalesPage })))
+const InventoryPage = lazy(() => import('./pages/InventoryPage').then((module) => ({ default: module.InventoryPage })))
+const ProductsPage = lazy(() => import('./pages/ProductsPage').then((module) => ({ default: module.ProductsPage })))
+const PurchasingPage = lazy(() => import('./pages/PurchasingPage').then((module) => ({ default: module.PurchasingPage })))
+const CustomersPage = lazy(() => import('./pages/CustomersPage').then((module) => ({ default: module.CustomersPage })))
+const SuppliersPage = lazy(() => import('./pages/SuppliersPage').then((module) => ({ default: module.SuppliersPage })))
+const ReturnsPage = lazy(() => import('./pages/ReturnsPage').then((module) => ({ default: module.ReturnsPage })))
+const ExpensesPage = lazy(() => import('./pages/ExpensesPage').then((module) => ({ default: module.ExpensesPage })))
+const CashPage = lazy(() => import('./pages/CashPage').then((module) => ({ default: module.CashPage })))
+const AccountingPage = lazy(() => import('./pages/AccountingPage').then((module) => ({ default: module.AccountingPage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const SyncPage = lazy(() => import('./pages/SyncPage').then((module) => ({ default: module.SyncPage })))
 
 function Splash() {
   return (
@@ -95,8 +97,9 @@ function ModeProtected() {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
+    <Suspense fallback={<Splash />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
       <Route path="/billing" element={<BillingProtected />} />
       <Route path="/mode" element={<ModeProtected />} />
       <Route element={<Protected />}>
@@ -206,7 +209,8 @@ export function App() {
         />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }

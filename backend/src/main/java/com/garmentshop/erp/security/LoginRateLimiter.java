@@ -2,11 +2,13 @@ package com.garmentshop.erp.security;
 
 import com.garmentshop.erp.common.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongSupplier;
 
 /**
  * Sliding-window login rate limiter keyed by client IP. Complements the per-account
@@ -17,19 +19,26 @@ public class LoginRateLimiter {
 
     private final int maxAttempts;
     private final long windowMillis;
+    private final LongSupplier clock;
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
     private final AtomicInteger calls = new AtomicInteger();
 
+    @Autowired
     public LoginRateLimiter(
             @Value("${app.security.login-rate-limit.max-attempts:30}") int maxAttempts,
             @Value("${app.security.login-rate-limit.window-seconds:300}") long windowSeconds) {
+        this(maxAttempts, windowSeconds, System::currentTimeMillis);
+    }
+
+    LoginRateLimiter(int maxAttempts, long windowSeconds, LongSupplier clock) {
         this.maxAttempts = Math.max(1, maxAttempts);
         this.windowMillis = Math.max(1, windowSeconds) * 1000L;
+        this.clock = clock;
     }
 
     public void checkAndRecord(HttpServletRequest request) {
         String key = clientIp(request);
-        long now = System.currentTimeMillis();
+        long now = clock.getAsLong();
         Window window = windows.compute(key, (ignored, current) -> {
             if (current == null || now - current.startedAt >= windowMillis) {
                 return new Window(now);
