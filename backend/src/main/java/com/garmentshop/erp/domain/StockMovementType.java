@@ -1,0 +1,6 @@
+package com.garmentshop.erp.domain;
+
+public enum StockMovementType {
+    OPENING, PURCHASE, SALE, SALE_RETURN, PURCHASE_RETURN, ADJUSTMENT, DAMAGE,
+    TRANSFER_OUT, TRANSFER_IN, EXCHANGE_OUT, EXCHANGE_IN, PHYSICAL_COUNT
+}

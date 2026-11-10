@@ -1,0 +1,6 @@
+package com.garmentshop.erp.domain;
+
+public enum NotificationEvent {
+    INVOICE_CONFIRMATION, PAYMENT_CONFIRMATION, PAYMENT_REMINDER, LOW_STOCK,
+    PURCHASE_ALERT, DAILY_SALES_SUMMARY, RETURN_REFUND
+}

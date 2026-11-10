@@ -1,0 +1,236 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --color-ivory-50: #fdfaf4;
+  --color-ivory-100: #f8f3e9;
+  --color-ivory-200: #f1e9da;
+  --color-ivory-300: #e6dac6;
+  --color-ivory-400: #d5c4a8;
+
+  --color-ink-900: #191816;
+  --color-ink-800: #23211d;
+  --color-ink-700: #302d27;
+  --color-ink-600: #4b463d;
+  --color-ink-500: #6d6558;
+  --color-ink-400: #8b8273;
+  --color-ink-300: #aaa08e;
+
+  --color-terracotta-50: #fbf1eb;
+  --color-terracotta-100: #f6ded1;
+  --color-terracotta-200: #edbca4;
+  --color-terracotta-300: #df9372;
+  --color-terracotta-400: #cf6c46;
+  --color-terracotta-500: #b8532f;
+  --color-terracotta-600: #9c4225;
+  --color-terracotta-700: #7d341f;
+
+  --color-saffron-100: #fcefd6;
+  --color-saffron-200: #f8dfae;
+  --color-saffron-300: #f0c675;
+  --color-saffron-400: #e8a33d;
+  --color-saffron-500: #d68a20;
+
+  --color-sage-100: #e8ede4;
+  --color-sage-200: #cfdac7;
+  --color-sage-300: #a9bd9c;
+  --color-sage-400: #7f9a6f;
+  --color-sage-500: #5e7153;
+  --color-sage-600: #47563e;
+
+  --color-brick-100: #f6e0db;
+  --color-brick-300: #d99a8d;
+  --color-brick-500: #a63a2e;
+  --color-brick-600: #8a2c22;
+
+  --color-line: #e5dac8;
+  --color-line-soft: #efe7d9;
+
+  --radius-xl2: 1.15rem;
+
+  --shadow-card: 0 1px 2px rgb(41 34 22 / 0.04), 0 10px 30px -18px rgb(41 34 22 / 0.18);
+  --shadow-float: 0 18px 50px -20px rgb(25 24 22 / 0.35);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-ivory-100);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01' on, 'cv11' on;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.5;
+    background-image:
+      radial-gradient(circle at 12% 18%, rgb(232 163 61 / 0.09), transparent 32%),
+      radial-gradient(circle at 88% 8%, rgb(184 83 47 / 0.06), transparent 26%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+
+  ::selection {
+    background: var(--color-saffron-200);
+    color: var(--color-ink-900);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-terracotta-400);
+    outline-offset: 2px;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+
+  /* Quiet scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ivory-400) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-ivory-400);
+    border-radius: 999px;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+  }
+
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .label-xs {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .card {
+    background: var(--color-ivory-50);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-xl2);
+    box-shadow: var(--shadow-card);
+  }
+
+  .hairline {
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--color-line) 0,
+      var(--color-line) 4px,
+      transparent 4px,
+      transparent 8px
+    );
+  }
+
+  .sidebar-texture {
+    background-image:
+      radial-gradient(circle at 20% 0%, rgb(232 163 61 / 0.1), transparent 38%),
+      radial-gradient(circle at 100% 100%, rgb(184 83 47 / 0.09), transparent 45%);
+  }
+
+  .animate-rise {
+    animation: rise 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-fade {
+    animation: fade 0.25s ease both;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Print pipeline: #print-root receives print-only markup (React portal). */
+#print-root {
+  display: none;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  body::before {
+    display: none;
+  }
+  /* Hide the whole app and every portal/overlay; only the print portal prints.
+     Normal document flow means long receipts flow across pages instead of being
+     chopped by position:fixed. */
+  body > *:not(#print-root) {
+    display: none !important;
+  }
+  #print-root {
+    display: block !important;
+  }
+  .print-receipt {
+    width: 80mm;
+    margin: 0 auto;
+    padding: 4mm;
+    background: #fff;
+  }
+  .print-receipt .card,
+  .print-receipt > div {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  @page {
+    margin: 6mm;
+  }
+}

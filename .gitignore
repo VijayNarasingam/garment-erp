@@ -1,0 +1,25 @@
+# Build outputs
+backend/target/
+frontend/dist/
+frontend/dev-dist/
+frontend/node_modules/
+
+# Runtime data (H2 database, logs, uploads, backups)
+data/
+backend/data/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Logs and temp files
+*.log
+*.tmp

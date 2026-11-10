@@ -1,0 +1,18 @@
+package com.garmentshop.erp.common;
+
+import lombok.Builder;
+import lombok.Getter;
+
+import java.time.Instant;
+import java.util.Map;
+
+@Getter
+@Builder
+public class ErrorResponse {
+    private final Instant timestamp;
+    private final int status;
+    private final String code;
+    private final String message;
+    private final Map<String, String> fieldErrors;
+    private final String path;
+}
