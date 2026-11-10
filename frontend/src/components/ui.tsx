@@ -369,7 +369,7 @@ export function Modal({
     md: 'max-w-xl',
     lg: 'max-w-3xl',
     xl: 'max-w-5xl',
-    full: 'max-w-[min(1200px,calc(100vw-2rem))]'
+    full: 'max-w-[min(1200px,calc(100vw_-_2rem))]'
   }
 
   return createPortal(
@@ -377,7 +377,7 @@ export function Modal({
       <div className="animate-fade absolute inset-0 bg-ink-900/45 backdrop-blur-[2px]" onClick={onClose} />
       <div
         className={cn(
-          'animate-rise relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-ivory-50 shadow-float sm:rounded-2xl',
+          'animate-rise relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-ivory-50 pb-[env(safe-area-inset-bottom)] shadow-float sm:rounded-2xl sm:pb-0',
           widths[size],
           className
         )}

@@ -55,4 +55,50 @@ test.describe('Garment ERP workspace', () => {
 
     await expect(page.getByText('Invalid username or password.')).toBeVisible()
   })
+
+  test('billing mode keeps the bill one tap away on a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 640 })
+    await signIn(page)
+    await page.getByRole('button', { name: /billing/i }).click()
+    await expect(page).toHaveURL(/\/billing$/)
+
+    // No horizontal overflow on a narrow counter screen.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+
+    const bar = page.getByRole('button', { name: 'Open current bill' })
+    await expect(bar).toBeVisible()
+
+    const cards = page.getByRole('button', { name: /left/i })
+    for (let index = 0; index < 4; index += 1) await cards.nth(index).click()
+    await expect(bar).toContainText('4 pcs')
+
+    await bar.click()
+    const charge = page.getByRole('button', { name: /^Charge / })
+    await charge.scrollIntoViewIfNeeded()
+    await expect(charge).toBeInViewport()
+
+    // The sheet itself scrolls to the payment block, and closing it restores page scroll.
+    expect(await page.locator('aside').evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    await page.getByRole('button', { name: 'Close bill' }).click()
+    const pageScroll = await page.evaluate(() => {
+      window.scrollTo(0, 500)
+      return window.scrollY
+    })
+    expect(pageScroll).toBeGreaterThan(0)
+  })
+
+  test('billing cart scrolls to the charge action on short desktop screens', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 560 })
+    await signIn(page)
+    await page.getByRole('button', { name: /billing/i }).click()
+    await expect(page).toHaveURL(/\/billing$/)
+
+    const cards = page.getByRole('button', { name: /left/i })
+    for (let index = 0; index < 5; index += 1) await cards.nth(index).click()
+
+    const charge = page.getByRole('button', { name: /^Charge / })
+    await charge.scrollIntoViewIfNeeded()
+    await expect(charge).toBeInViewport()
+    expect(await page.locator('aside').evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+  })
 })

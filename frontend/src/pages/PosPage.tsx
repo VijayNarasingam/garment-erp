@@ -6,6 +6,7 @@ import {
   Banknote,
   Check,
   ChevronDown,
+  ChevronUp,
   CloudOff,
   CreditCard,
   Minus,
@@ -107,10 +108,29 @@ export function PosPage() {
   const [invoiceListOpen, setInvoiceListOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null)
   const [invoiceListSearch, setInvoiceListSearch] = useState('')
+  const [cartOpen, setCartOpen] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const scanTimer = useRef<number>(0)
 
   const branch = branches.find((item) => item.id === branchId)
+
+  // Counters usually have a hardware scanner, but on phones auto-focus pops the
+  // soft keyboard and covers half the catalogue — only focus on tablet/desktop.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
+      searchInputRef.current?.focus()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!cartOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCartOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [cartOpen])
 
   const { data: productPage, isLoading: productsLoading, isError: productsError } = useQuery({
     queryKey: ['pos-products'],
@@ -286,6 +306,7 @@ export function PosPage() {
 
   const returnCredit = (returnCart?.items ?? []).reduce((sum, item) => sum + item.perUnit * item.quantity, 0)
   const dueTotal = Math.max(0, Math.round((totals.total - returnCredit) * 100) / 100)
+  const pieces = lines.reduce((sum, line) => sum + line.quantity, 0)
 
   useEffect(() => {
     if (!paymentDirty) {
@@ -501,6 +522,7 @@ export function PosPage() {
       pendingSaleIdRef.current = null
       setReceipt({ invoice })
       clearCart()
+      setCartOpen(false)
       setApproverOpen(false)
       setApproverPin('')
       queryClient.invalidateQueries({ queryKey: ['stock', branchId] })
@@ -632,6 +654,7 @@ export function PosPage() {
 
       if (!isExchange && returnsResponse.status === 'PENDING') {
         clearCart()
+        setCartOpen(false)
         setReturnCart(null)
         toast.push('Return sent for approval', {
           description: `${returnsResponse.returnNo} · refund ${money(returnCreditTotal)} awaits manager approval`,
@@ -651,6 +674,7 @@ export function PosPage() {
         }
       })
       clearCart()
+      setCartOpen(false)
       setReturnCart(null)
       toast.push(isExchange ? 'Exchange complete' : 'Return recorded', {
         description: isExchange
@@ -699,6 +723,7 @@ export function PosPage() {
       setQueueCount((count) => count + 1)
       setReceipt({ offline: offlineSale })
       clearCart()
+      setCartOpen(false)
       toast.push('Saved offline', {
         description: 'The bill is queued and will receive a server invoice number at sync.',
         tone: 'info'
@@ -913,11 +938,11 @@ export function PosPage() {
   )
 
   return (
-    <div className="animate-fade">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div className="animate-fade pb-24 xl:pb-0">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3 sm:mb-4">
         <div>
           <p className="label-xs mb-1.5 text-terracotta-500">Counter · {branch?.name}</p>
-          <h1 className="font-display text-[30px] font-semibold leading-none tracking-[-0.01em] text-ink-900">Point of sale</h1>
+          <h1 className="font-display text-[26px] font-semibold leading-none tracking-[-0.01em] text-ink-900 sm:text-[30px]">Point of sale</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {backendOffline && (
@@ -961,7 +986,7 @@ export function PosPage() {
                   }}
                   placeholder="Scan barcode · style, SKU, size search…"
                   className="h-11 w-full rounded-xl border border-line bg-ivory-50 pl-10 pr-16 text-[13px] text-ink-900 placeholder:text-ink-300 focus:border-terracotta-400 focus:outline-none focus:ring-4 focus:ring-terracotta-500/10"
-                  autoFocus
+                  ref={searchInputRef}
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line bg-ivory-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-ink-400">
                   F2
@@ -1078,15 +1103,30 @@ export function PosPage() {
           )}
         </div>
 
-        <aside className="card flex min-h-[600px] flex-col overflow-hidden xl:sticky xl:top-[70px] xl:max-h-[calc(100vh-86px)]">
-          <div className="flex items-center justify-between border-b border-line-soft px-4 py-3.5">
+        <aside
+          className={cn(
+            'flex flex-col overflow-y-auto overscroll-contain rounded-t-2xl border border-line bg-ivory-50 shadow-float',
+            // Phones/tablets: bottom-sheet bill, opened from the sticky bill bar.
+            'fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] rounded-b-none border-x-0 border-b-0 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] transition-transform duration-300',
+            cartOpen ? 'visible translate-y-0' : 'invisible translate-y-full',
+            // Desktop: sticky sidebar. The whole panel scrolls, so totals/payment can never be clipped.
+            'xl:visible xl:sticky xl:top-[70px] xl:bottom-auto xl:left-auto xl:right-auto xl:z-auto xl:h-[calc(100dvh_-_140px)] xl:max-h-none xl:translate-y-0 xl:rounded-[1.15rem] xl:border xl:pb-0 xl:shadow-card'
+          )}
+        >
+          <div className="flex shrink-0 justify-center pt-2 xl:hidden">
+            <span className="h-1 w-9 rounded-full bg-ivory-400" aria-hidden />
+          </div>
+          <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-line-soft bg-ivory-50 px-4 py-3.5">
             <div>
               <p className="label-xs text-ink-400">Current bill</p>
               <p className="mt-0.5 font-display text-[17px] font-semibold leading-none text-ink-900">
-                {lines.length === 0 ? 'New sale' : `${lines.reduce((sum, line) => sum + line.quantity, 0)} pieces`}
+                {lines.length === 0 ? 'New sale' : `${pieces} pieces`}
               </p>
             </div>
             <div className="flex items-center gap-1">
+              <IconButton label="Close bill" onClick={() => setCartOpen(false)} className="xl:hidden">
+                <ChevronDown size={16} />
+              </IconButton>
               <Button variant="ghost" size="sm" onClick={() => setHoldOpen(true)} disabled={lines.length === 0 || returnCart !== null} title={returnCart ? 'Complete the exchange or remove return lines before holding' : undefined}>
                 Hold
               </Button>
@@ -1103,7 +1143,7 @@ export function PosPage() {
               setShowNewCustomer(false)
               setCustomerOpen(true)
             }}
-            className="flex items-center gap-2.5 border-b border-line-soft bg-ivory-100/40 px-4 py-2.5 text-left transition-colors hover:bg-ivory-100"
+            className="flex shrink-0 items-center gap-2.5 border-b border-line-soft bg-ivory-100/40 px-4 py-2.5 text-left transition-colors hover:bg-ivory-100"
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ivory-200 text-ink-500">
               <UserRound size={13} />
@@ -1133,7 +1173,7 @@ export function PosPage() {
           </button>
 
           {returnCart && (
-            <div className="border-b border-line-soft bg-saffron-400/[0.07] px-4 py-2.5">
+            <div className="shrink-0 border-b border-line-soft bg-saffron-400/[0.07] px-4 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="flex min-w-0 items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.16em] text-saffron-600">
                   <ArrowLeftRight size={11} className="shrink-0" />
@@ -1169,7 +1209,7 @@ export function PosPage() {
             </div>
           )}
 
-          <div className="min-h-[160px] flex-1 overflow-y-auto">
+          <div className="min-h-[140px] grow shrink-0">
             {lines.length === 0 && !returnCart && (
               <div className="flex h-full flex-col items-center justify-center px-6 py-10 text-center">
                 <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-dashed border-ivory-400 bg-ivory-100 text-ink-300">
@@ -1282,7 +1322,7 @@ export function PosPage() {
             )}
           </div>
 
-          <div className="border-t border-line-soft bg-ivory-100/40 px-4 py-3">
+          <div className="shrink-0 border-t border-line-soft bg-ivory-100/40 px-4 py-3">
             <div className="space-y-1 text-[11px]">
               <TotalRow label="Subtotal" value={money(totals.subtotal)} />
               {totals.itemDiscount > 0 && <TotalRow label="Item discount" value={`− ${money(totals.itemDiscount)}`} accent />}
@@ -1353,7 +1393,7 @@ export function PosPage() {
             )}
           </div>
 
-          <div className="border-t border-line-soft px-4 py-3">
+          <div className="shrink-0 border-t border-line-soft px-4 py-3">
             <div className="mb-2 flex items-center justify-between">
               <p className="label-xs text-ink-400">Payment</p>
               {payments.length > 1 && <span className="text-[9px] text-ink-400">{payments.length} tenders</span>}
@@ -1440,6 +1480,48 @@ export function PosPage() {
             )}
           </div>
         </aside>
+      </div>
+
+      {cartOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-ink-900/45 backdrop-blur-[2px] xl:hidden"
+          onClick={() => setCartOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* Mobile bill bar — the cart and Charge button stay one tap away on phones/tablets. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ivory-50/95 px-3 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_-22px_rgba(25,24,22,0.45)] backdrop-blur xl:hidden">
+        <button
+          type="button"
+          onClick={() => setCartOpen(true)}
+          className="flex w-full items-center gap-3 rounded-xl bg-ink-900 px-3 py-2.5 text-left text-ivory-100 transition-colors hover:bg-ink-800"
+          aria-label="Open current bill"
+        >
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ivory-50/10">
+            <ShoppingBag size={16} />
+            {pieces > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-terracotta-500 px-1 text-[9px] font-bold text-white">
+                {pieces}
+              </span>
+            )}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[9px] font-bold uppercase tracking-[0.16em] text-ivory-200/45">
+              {returnCart ? 'Return · current bill' : 'Current bill'}
+            </span>
+            <span className="num block truncate text-[15px] font-semibold leading-tight">
+              {money(returnCart ? dueTotal : totals.total)}
+              <span className="ml-1.5 font-sans text-[10px] font-medium text-ivory-200/45">
+                {pieces > 0 ? `${pieces} pcs` : returnCart ? '' : 'empty'}
+              </span>
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1 rounded-lg bg-terracotta-500 px-2.5 py-2 text-[11px] font-bold">
+            {returnCart && lines.length === 0 ? 'Refund' : 'View bill'}
+            <ChevronUp size={13} />
+          </span>
+        </button>
       </div>
 
       <Modal

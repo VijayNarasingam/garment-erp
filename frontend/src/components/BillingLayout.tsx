@@ -14,8 +14,8 @@ export function BillingLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-ivory-50/10 bg-ink-900 px-3 text-ivory-200 sm:px-4">
+    <div className="relative z-10 flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-ivory-50/10 bg-ink-900 px-3 text-ivory-200 sm:gap-3 sm:px-4">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ivory-50/8 ring-1 ring-ivory-50/10">
           <svg viewBox="0 0 64 64" className="h-4 w-4" aria-hidden>
             <path d="M20 45 32 17l12 28h-6.6L32 32.4 26.6 45z" fill="#E8A33D" />
@@ -43,7 +43,7 @@ export function BillingLayout({ children }: { children: ReactNode }) {
             <Select
               value={String(branchId)}
               onChange={(event) => setBranchId(Number(event.target.value))}
-              className="h-8 w-[160px] text-[11px]"
+              className="h-8 w-[122px] text-[11px] sm:w-[160px]"
               aria-label="Active branch"
             >
               {branches.map((branch) => (
@@ -85,7 +85,7 @@ export function BillingLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1560px] flex-1 px-4 py-4 sm:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-[1560px] min-w-0 flex-1 px-3 py-3 sm:px-6 sm:py-4">{children}</main>
     </div>
   )
 }
