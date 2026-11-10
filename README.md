@@ -88,7 +88,47 @@ cd frontend && npm run build
 ```
 
 Unit tests cover the refund-method policy, login rate limiter and invoice numbering.
-CI (`.github/workflows/ci.yml`) runs both jobs on push and pull requests.
+CI (`.github/workflows/ci.yml`) runs backend tests, frontend build, Playwright E2E, a real MySQL
+Flyway migration and Docker image builds on push and pull requests.
+
+### End-to-end tests
+
+Playwright covers sign-in, the mode chooser, dashboard, sales/returns navigation and invalid
+credentials. The backend must be running on `:8080` with demo data; the config starts Vite
+automatically.
+
+```bash
+cd frontend
+npx playwright install chromium   # first run only
+npm run test:e2e
+```
+
+To test a deployed stack (for example the Docker compose frontend):
+
+```bash
+E2E_BASE_URL=http://localhost:8088 npm run test:e2e
+```
+
+Override credentials with `E2E_USERNAME` / `E2E_PASSWORD`.
+
+### Post-deploy smoke test
+
+After `docker compose up` (or any deployment), run the dependency-free API smoke test:
+
+```bash
+node scripts/smoke.mjs
+```
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `BASE_URL` | `http://localhost:8080` | Backend base URL |
+| `SMOKE_USERNAME` / `SMOKE_PASSWORD` | `owner` / `Retail@123` | Login credentials |
+| `SMOKE_BRANCH_ID` | first available | Branch filter for list endpoints |
+| `SMOKE_FRONTEND_URL` | unset | Also check the frontend shell is served |
+
+It verifies health, rejects anonymous API calls, logs in, and exercises the dashboard,
+returns list/summary and sales invoice list. It exits non-zero on the first failure, so it can
+be used in CI or after a deploy.
 
 ## Database migrations
 
@@ -96,8 +136,19 @@ CI (`.github/workflows/ci.yml`) runs both jobs on push and pull requests.
   from the JPA entity model (56 tables, 88 foreign keys).
 - The `mysql` profile runs Flyway before Hibernate validates the schema.
 - Add new changes as `V2__description.sql`, `V3__description.sql`, and never edit an applied file.
-- The baseline has been reviewed statically; run it against a real MySQL 8 instance in staging
-  before the first production deploy.
+- CI applies the baseline to a MySQL 8.4 service container on every push, and the Docker compose
+  stack re-runs Flyway plus Hibernate `ddl-auto: validate` at startup.
+- To test a migration manually against any MySQL instance:
+
+  ```bash
+  cd backend
+  mvn flyway:migrate \
+    -Dflyway.url=jdbc:mysql://127.0.0.1:3306/garment_erp \
+    -Dflyway.user=garment -Dflyway.password=garment
+  ```
+
+- Flyway 10.20 (managed by Spring Boot 3.4) logs an upgrade warning for MySQL 8.4 because 8.1 is
+  the newest version it officially lists. The baseline and Hibernate validation both pass on 8.4.
 
 ## Project layout
 

@@ -53,7 +53,8 @@ public class SecurityConfig {
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers("/api/auth/login").permitAll()
-                            .requestMatchers("/api/public/**", "/actuator/health", "/actuator/info").permitAll()
+                            .requestMatchers("/api/public/**", "/actuator/health", "/actuator/health/**",
+                                    "/actuator/info").permitAll()
                             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
                     if (apiDocsEnabled) {
                         auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
