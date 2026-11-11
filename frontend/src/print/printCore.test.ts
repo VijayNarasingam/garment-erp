@@ -362,6 +362,24 @@ describe('layoutReceipt', () => {
       expect(line.text.length).toBeLessThanOrEqual(32)
     }
   })
+
+  it('keeps a long shop name and thank-you note inside the paper', () => {
+    const model = baseModel({
+      shop: { ...baseModel().shop, name: 'Vijay Trendy hub of Madurai' },
+      footer: 'Thank you for shopping with us! Visit again soon.'
+    })
+    const lines = layoutReceipt(model).map((line) => line.text)
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(48)
+    expect(lines).toContain('Thank you for shopping with us! Visit again')
+    expect(lines).toContain('soon.')
+  })
+
+  it('puts the date on its own line on narrow paper instead of splitting the bill number', () => {
+    const lines = layoutReceipt(baseModel({ paperWidth: 58 })).map((line) => line.text)
+    expect(lines).toContain('Bill: INV/2026-27/000123')
+    expect(lines.some((line) => line.trim() === '04-03-2026 10:05')).toBe(true)
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(32)
+  })
 })
 
 describe('upiUri', () => {

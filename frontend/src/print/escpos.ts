@@ -102,22 +102,38 @@ export function layoutReceipt(model: ReceiptModel): ReceiptLine[] {
   }
   const centered = (text: string, options: Omit<ReceiptLine, 'text' | 'align'> = {}) =>
     push(text, { ...options, align: 'center' })
+  /** Centred text folded to the paper width, so nothing runs off the roll. */
+  const centeredLines = (text: string, options: Omit<ReceiptLine, 'text' | 'align'> = {}) => {
+    for (const line of wrapText(text, width)) push(line, { ...options, align: 'center' })
+  }
   const separator = (character: string) => push(character.repeat(width))
+  /**
+   * Label and amount on one line when they fit. On narrow paper the amount moves
+   * to its own right-aligned line, so numbers are never split in the middle.
+   */
+  const rowOrStack = (left: string, right: string, options: Omit<ReceiptLine, 'text' | 'align'> = {}) => {
+    if (foldAscii(left).length + 1 + foldAscii(right).length <= width) {
+      for (const line of row(left, right, width)) push(line, options)
+      return
+    }
+    for (const line of wrapText(left, width)) push(line, options)
+    push(right, { ...options, align: 'right' })
+  }
 
-  centered(model.shop.name, { bold: true, large: true })
-  if (model.shop.branchName) centered(model.shop.branchName)
+  centeredLines(model.shop.name, { bold: true, large: true })
+  if (model.shop.branchName) centeredLines(model.shop.branchName)
   for (const address of model.shop.addressLines) {
     for (const line of wrapText(address, width)) centered(line)
   }
-  if (model.shop.phone) centered(`Contact: ${model.shop.phone}`)
-  if (model.shop.gstEnabled && model.shop.gstin) centered(`GSTIN ${model.shop.gstin}`)
-  centered(model.shop.gstEnabled ? 'TAX INVOICE' : 'BILL', { bold: true })
+  if (model.shop.phone) centeredLines(`Contact: ${model.shop.phone}`)
+  if (model.shop.gstEnabled && model.shop.gstin) centeredLines(`GSTIN ${model.shop.gstin}`)
+  centeredLines(model.shop.gstEnabled ? 'TAX INVOICE' : 'BILL', { bold: true })
 
   if (model.duplicate) centered('*** DUPLICATE ***', { bold: true })
   if (model.cancelled) centered('*** CANCELLED ***', { bold: true })
 
   separator('=')
-  for (const line of row(`Bill: ${model.invoiceNo}`, model.invoiceDate, width)) push(line)
+  rowOrStack(`Bill: ${model.invoiceNo}`, model.invoiceDate)
   if (model.offlineNote) centered(model.offlineNote, { bold: true })
 
   if (model.shows.cashier && model.cashier) push(`Cashier: ${model.cashier}`)
@@ -145,45 +161,45 @@ export function layoutReceipt(model: ReceiptModel): ReceiptLine[] {
     const amount = formatAmount(item.lineAmount)
     let left = model.shows.itemRate ? `  ${item.quantity} x ${formatAmount(item.unitPrice)}` : `  ${item.quantity} pc`
     if (model.shows.itemDiscount && item.discountAmount > 0) left += `  -${formatAmount(item.discountAmount)}`
-    for (const line of row(left, amount, width)) push(line)
+    rowOrStack(left, amount)
   }
 
   separator('-')
-  for (const line of row('Subtotal', formatAmount(model.totals.subtotal), width)) push(line)
+  rowOrStack('Subtotal', formatAmount(model.totals.subtotal))
   if (model.totals.discountTotal > 0) {
-    for (const line of row('Discounts', `-${formatAmount(model.totals.discountTotal)}`, width)) push(line)
+    rowOrStack('Discounts', `-${formatAmount(model.totals.discountTotal)}`)
   }
   for (const charge of model.charges) {
-    for (const line of row(charge.name, formatAmount(charge.amount), width)) push(line)
+    rowOrStack(charge.name, formatAmount(charge.amount))
   }
   if (model.shop.gstEnabled) {
-    for (const line of row('Taxable value', formatAmount(model.totals.taxableAmount), width)) push(line)
+    rowOrStack('Taxable value', formatAmount(model.totals.taxableAmount))
     for (const group of model.taxGroups) {
       if (model.interState) {
-        for (const line of row(`IGST ${formatTaxRate(group.rate)}`, formatAmount(group.tax), width)) push(line)
+        rowOrStack(`IGST ${formatTaxRate(group.rate)}`, formatAmount(group.tax))
       } else {
         const cgst = Math.round((group.tax / 2) * 100) / 100
         const sgst = Math.round((group.tax - cgst) * 100) / 100
-        for (const line of row(`CGST ${formatTaxRate(group.rate / 2)}`, formatAmount(cgst), width)) push(line)
-        for (const line of row(`SGST ${formatTaxRate(group.rate / 2)}`, formatAmount(sgst), width)) push(line)
+        rowOrStack(`CGST ${formatTaxRate(group.rate / 2)}`, formatAmount(cgst))
+        rowOrStack(`SGST ${formatTaxRate(group.rate / 2)}`, formatAmount(sgst))
       }
     }
   }
   if (Math.abs(model.totals.roundOff) >= 0.005) {
-    for (const line of row('Round off', signed(model.totals.roundOff), width)) push(line)
+    rowOrStack('Round off', signed(model.totals.roundOff))
   }
-  for (const line of row('TOTAL', `Rs.${formatAmount(model.totals.total)}`, width)) push(line, { bold: true, large: true })
+  rowOrStack('TOTAL', `Rs.${formatAmount(model.totals.total)}`, { bold: true, large: true })
 
   if (model.shows.payment) {
     for (const payment of model.payments) {
-      for (const line of row(`Paid (${paymentLabel(payment.method)})`, formatAmount(payment.amount), width)) push(line)
+      rowOrStack(`Paid (${paymentLabel(payment.method)})`, formatAmount(payment.amount))
     }
     if (model.totals.balanceAmount > 0.004) {
-      for (const line of row('Balance due', formatAmount(model.totals.balanceAmount), width)) push(line)
+      rowOrStack('Balance due', formatAmount(model.totals.balanceAmount))
     }
     const change = model.totals.paidAmount - model.totals.total
     if (change > 0.004) {
-      for (const line of row('Change', formatAmount(change), width)) push(line)
+      rowOrStack('Change', formatAmount(change))
     }
   }
 
@@ -201,8 +217,8 @@ export function layoutReceipt(model: ReceiptModel): ReceiptLine[] {
   if (model.shows.upiQr && model.upi) {
     push()
     push('', { align: 'center', qr: upiUri(model.upi) })
-    centered(`Scan to pay Rs.${formatAmount(model.upi.amount)}`)
-    centered(`UPI: ${model.upi.vpa}`)
+    centeredLines(`Scan to pay Rs.${formatAmount(model.upi.amount)}`)
+    centeredLines(`UPI: ${model.upi.vpa}`)
   }
 
   if (model.shows.terms && model.terms) {
@@ -212,7 +228,7 @@ export function layoutReceipt(model: ReceiptModel): ReceiptLine[] {
 
   if (model.duplicate) centered('*** DUPLICATE ***', { bold: true })
   push()
-  centered(model.footer)
+  centeredLines(model.footer)
   return lines
 }
 

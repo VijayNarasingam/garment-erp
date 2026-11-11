@@ -110,6 +110,20 @@ printer, so the app never hangs during a print.
 Logs: `%ProgramData%\GarmentPrintAgent\logs\agent-YYYY-MM-DD.log`
 (one file per day, seven days kept, 5 MB cap).
 
+## Check the paper without burning paper
+
+From the `frontend` folder:
+
+```powershell
+npm run print:preview
+```
+
+It builds the real ESC/POS byte stream for a sample bill, replays it through a
+small ESC/POS interpreter and writes `frontend/print-preview/` — `receipt.bin`
+(the exact bytes), `receipt.txt` (the decoded paper) and `receipt.png` (a
+picture of the 80 mm roll, plus the 58 mm and duplicate variants). Use it after
+changing the receipt template.
+
 ## Troubleshooting
 
 **The app says "Agent not running".**
