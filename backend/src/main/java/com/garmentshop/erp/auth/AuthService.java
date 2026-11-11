@@ -165,7 +165,11 @@ public class AuthService {
                 business.getExchangeWindowDays(), business.isReturnApprovalRequired(),
                 business.isRefundToOriginalMethodOnly(), business.isAllowNegativeStockWithApproval(),
                 business.getCostingMethod().name(), business.getFinancialYearStartMonth(),
-                business.getThankYouNote());
+                business.getThankYouNote(), business.isReceiptShowCustomer(), business.isReceiptShowCashier(),
+                business.isReceiptShowPayment(), business.isReceiptShowUpiQr(), business.isReceiptShowTerms(),
+                business.isReceiptShowSku(), business.isReceiptShowSizeColor(), business.isReceiptShowHsn(),
+                business.isReceiptShowItemRate(), business.isReceiptShowItemDiscount(),
+                business.getReceiptTerms(), business.getUpiId(), business.getUpiPayeeName());
     }
 
     public void assertSameBusiness(User user, Long businessId) {

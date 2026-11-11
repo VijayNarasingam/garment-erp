@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -21,7 +22,13 @@ public final class BusinessDtos {
                                    boolean defaultTaxInclusive, String costingMethod, int returnWindowDays,
                                    int exchangeWindowDays, boolean returnApprovalRequired,
                                    boolean refundToOriginalMethodOnly, BigDecimal maxDiscountPercent,
-                                   boolean allowNegativeStockWithApproval, String timezone, String thankYouNote) {
+                                   boolean allowNegativeStockWithApproval, String timezone, String thankYouNote,
+                                   boolean receiptShowCustomer, boolean receiptShowCashier,
+                                   boolean receiptShowPayment, boolean receiptShowUpiQr,
+                                   boolean receiptShowTerms, boolean receiptShowSku,
+                                   boolean receiptShowSizeColor, boolean receiptShowHsn,
+                                   boolean receiptShowItemRate, boolean receiptShowItemDiscount,
+                                   String receiptTerms, String upiId, String upiPayeeName) {
     }
 
     public record UpdateBusinessRequest(
@@ -44,7 +51,22 @@ public final class BusinessDtos {
             @DecimalMin("0.0") @DecimalMax("100.0") BigDecimal maxDiscountPercent,
             boolean allowNegativeStockWithApproval,
             @Size(max = 60) String timezone,
-            @Size(max = 200) String thankYouNote
+            @Size(max = 200) String thankYouNote,
+            boolean receiptShowCustomer,
+            boolean receiptShowCashier,
+            boolean receiptShowPayment,
+            boolean receiptShowUpiQr,
+            boolean receiptShowTerms,
+            boolean receiptShowSku,
+            boolean receiptShowSizeColor,
+            boolean receiptShowHsn,
+            boolean receiptShowItemRate,
+            boolean receiptShowItemDiscount,
+            @Size(max = 500) String receiptTerms,
+            @Size(max = 100)
+            @Pattern(regexp = "^$|^[A-Za-z0-9._-]{2,64}@[A-Za-z0-9.-]{2,64}$",
+                    message = "UPI ID must look like shop@bank") String upiId,
+            @Size(max = 150) String upiPayeeName
     ) {
     }
 }

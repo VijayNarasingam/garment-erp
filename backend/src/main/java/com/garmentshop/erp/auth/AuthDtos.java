@@ -32,7 +32,13 @@ public final class AuthDtos {
                                String invoicePrefix, boolean roundOffEnabled, boolean defaultTaxInclusive,
                                int returnWindowDays, int exchangeWindowDays, boolean returnApprovalRequired,
                                boolean refundToOriginalMethodOnly, boolean allowNegativeStockWithApproval,
-                               String costingMethod, int financialYearStartMonth, String thankYouNote) {
+                               String costingMethod, int financialYearStartMonth, String thankYouNote,
+                               boolean receiptShowCustomer, boolean receiptShowCashier,
+                               boolean receiptShowPayment, boolean receiptShowUpiQr,
+                               boolean receiptShowTerms, boolean receiptShowSku,
+                               boolean receiptShowSizeColor, boolean receiptShowHsn,
+                               boolean receiptShowItemRate, boolean receiptShowItemDiscount,
+                               String receiptTerms, String upiId, String upiPayeeName) {
     }
 
     public record LoginResponse(String token, long expiresIn, UserInfo user, BusinessInfo business) {

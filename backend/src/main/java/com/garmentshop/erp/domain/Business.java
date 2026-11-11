@@ -88,6 +88,47 @@ public class Business extends BaseEntity {
             columnDefinition = "varchar(200) default 'Thank you for shopping with us!'")
     private String thankYouNote = DEFAULT_THANK_YOU_NOTE;
 
+    // ---------- Receipt template (business-wide, used by the 58/80 mm thermal bill) ----------
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean receiptShowCustomer = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean receiptShowCashier = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean receiptShowPayment = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean receiptShowUpiQr = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean receiptShowTerms = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean receiptShowSku = false;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean receiptShowSizeColor = false;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean receiptShowHsn = false;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean receiptShowItemRate = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean receiptShowItemDiscount = true;
+
+    @Column(length = 500)
+    private String receiptTerms;
+
+    @Column(length = 100)
+    private String upiId;
+
+    @Column(length = 150)
+    private String upiPayeeName;
+
     @Column(columnDefinition = "TEXT")
     private String settingsJson;
 

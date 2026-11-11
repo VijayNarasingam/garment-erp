@@ -55,6 +55,19 @@ public class BusinessService {
         business.setAllowNegativeStockWithApproval(request.allowNegativeStockWithApproval());
         business.setTimezone(request.timezone() == null ? "Asia/Kolkata" : request.timezone());
         business.setThankYouNote(normalizeThankYouNote(request.thankYouNote()));
+        business.setReceiptShowCustomer(request.receiptShowCustomer());
+        business.setReceiptShowCashier(request.receiptShowCashier());
+        business.setReceiptShowPayment(request.receiptShowPayment());
+        business.setReceiptShowUpiQr(request.receiptShowUpiQr());
+        business.setReceiptShowTerms(request.receiptShowTerms());
+        business.setReceiptShowSku(request.receiptShowSku());
+        business.setReceiptShowSizeColor(request.receiptShowSizeColor());
+        business.setReceiptShowHsn(request.receiptShowHsn());
+        business.setReceiptShowItemRate(request.receiptShowItemRate());
+        business.setReceiptShowItemDiscount(request.receiptShowItemDiscount());
+        business.setReceiptTerms(blankToNull(request.receiptTerms()));
+        business.setUpiId(blankToNull(request.upiId()));
+        business.setUpiPayeeName(blankToNull(request.upiPayeeName()));
         businessRepository.save(business);
         auditService.log("BUSINESS_SETTINGS_UPDATED", "BUSINESS", business.getId(), before, snapshot(business),
                 "Business configuration updated", null, null);
@@ -72,7 +85,20 @@ public class BusinessService {
                 Map.entry("exchangeWindowDays", b.getExchangeWindowDays()),
                 Map.entry("maxDiscountPercent", b.getMaxDiscountPercent()),
                 Map.entry("allowNegativeStockWithApproval", b.isAllowNegativeStockWithApproval()),
-                Map.entry("costingMethod", b.getCostingMethod().name())
+                Map.entry("costingMethod", b.getCostingMethod().name()),
+                Map.entry("receiptShowCustomer", b.isReceiptShowCustomer()),
+                Map.entry("receiptShowCashier", b.isReceiptShowCashier()),
+                Map.entry("receiptShowPayment", b.isReceiptShowPayment()),
+                Map.entry("receiptShowUpiQr", b.isReceiptShowUpiQr()),
+                Map.entry("receiptShowTerms", b.isReceiptShowTerms()),
+                Map.entry("receiptShowSku", b.isReceiptShowSku()),
+                Map.entry("receiptShowSizeColor", b.isReceiptShowSizeColor()),
+                Map.entry("receiptShowHsn", b.isReceiptShowHsn()),
+                Map.entry("receiptShowItemRate", b.isReceiptShowItemRate()),
+                Map.entry("receiptShowItemDiscount", b.isReceiptShowItemDiscount()),
+                Map.entry("receiptTerms", b.getReceiptTerms() == null ? "" : b.getReceiptTerms()),
+                Map.entry("upiId", b.getUpiId() == null ? "" : b.getUpiId()),
+                Map.entry("upiPayeeName", b.getUpiPayeeName() == null ? "" : b.getUpiPayeeName())
         );
     }
 
@@ -82,7 +108,11 @@ public class BusinessService {
                 b.getFinancialYearStartMonth(), b.getInvoicePrefix(), b.isRoundOffEnabled(),
                 b.isDefaultTaxInclusive(), b.getCostingMethod().name(), b.getReturnWindowDays(),
                 b.getExchangeWindowDays(), b.isReturnApprovalRequired(), b.isRefundToOriginalMethodOnly(),
-                b.getMaxDiscountPercent(), b.isAllowNegativeStockWithApproval(), b.getTimezone(), b.getThankYouNote());
+                b.getMaxDiscountPercent(), b.isAllowNegativeStockWithApproval(), b.getTimezone(), b.getThankYouNote(),
+                b.isReceiptShowCustomer(), b.isReceiptShowCashier(), b.isReceiptShowPayment(),
+                b.isReceiptShowUpiQr(), b.isReceiptShowTerms(), b.isReceiptShowSku(),
+                b.isReceiptShowSizeColor(), b.isReceiptShowHsn(), b.isReceiptShowItemRate(),
+                b.isReceiptShowItemDiscount(), b.getReceiptTerms(), b.getUpiId(), b.getUpiPayeeName());
     }
 
     private String normalizeThankYouNote(String value) {
