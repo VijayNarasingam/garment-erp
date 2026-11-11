@@ -42,6 +42,19 @@ export interface BusinessInfo {
   costingMethod: string
   financialYearStartMonth: number
   thankYouNote?: string
+  receiptShowCustomer: boolean
+  receiptShowCashier: boolean
+  receiptShowPayment: boolean
+  receiptShowUpiQr: boolean
+  receiptShowTerms: boolean
+  receiptShowSku: boolean
+  receiptShowSizeColor: boolean
+  receiptShowHsn: boolean
+  receiptShowItemRate: boolean
+  receiptShowItemDiscount: boolean
+  receiptTerms?: string
+  upiId?: string
+  upiPayeeName?: string
 }
 
 export interface BusinessSettings extends BusinessInfo {

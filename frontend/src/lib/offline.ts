@@ -2,6 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { api } from './api'
 import { uuid } from './format'
 import type { CreateSaleRequest, PullSnapshot, SyncBatchResponse, SyncItemResult } from './types'
+import type { ReceiptSnapshot } from '../print/types'
 
 export interface OfflineSale {
   offlineId: string
@@ -13,6 +14,11 @@ export interface OfflineSale {
   status: 'QUEUED' | 'CONFLICT' | 'REJECTED'
   message?: string
   result?: SyncItemResult
+  /**
+   * Frozen receipt for bills printed while offline. Older queued sales do not have
+   * one, so their reprint falls back to generic item labels.
+   */
+  receiptSnapshot?: ReceiptSnapshot
 }
 
 interface ErpDB extends DBSchema {
