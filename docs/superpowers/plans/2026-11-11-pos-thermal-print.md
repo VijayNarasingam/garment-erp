@@ -134,3 +134,14 @@
 6. Post a bill while the server is unreachable (offline queue) and print it.
 7. Flyway `V2__receipt_print_settings.sql` still has to run against the MySQL
    profile; the local and test profiles use `ddl-auto` and never run it.
+
+### Found on the first real print (shop PC)
+
+- The bill printed by the printer `RP 3220 star` (port `USBPOS0`) wrapped at
+  **42 characters**, while the driver reports 72 mm (48 characters). Every
+  amount was cut in half by the printer (`2,` / `498.00`). Fixed by
+  `Characters per line`, a value kept per printer and measured with the
+  calibration ruler on the test print.
+- `Get-Printer` does not list that ESC/POS roll driver, so the agent offered
+  only the virtual printers. The agent now enumerates through
+  `Win32_Printer`, which sees every installed printer.
