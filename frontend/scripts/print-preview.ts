@@ -13,6 +13,7 @@ import QRCode from 'qrcode'
 import { buildEscPos } from '../src/print/escpos'
 import { buildReceiptModel } from '../src/print/receiptModel'
 import { DEFAULT_PRINT_PREFS } from '../src/print/printPrefs'
+import type { PrintPrefs } from '../src/print/types'
 import type { Invoice } from '../src/lib/types'
 
 const business = {
@@ -243,8 +244,25 @@ const bytes = buildEscPos(model)
 const outDir = resolve(process.cwd(), 'print-preview')
 mkdirSync(outDir, { recursive: true })
 
+// The shop printer fits 42 characters even though the driver claims 72 mm (48 columns).
+const calibrated: PrintPrefs = {
+  ...DEFAULT_PRINT_PREFS,
+  printer: 'RP 3220 star',
+  columnsByPrinter: { 'RP 3220 star': 42 }
+}
+
 const variants = [
   { name: 'receipt', model, paper: 80 },
+  {
+    name: 'receipt-42col',
+    model: buildReceiptModel({ invoice, business, branch, user, prefs: calibrated })!,
+    paper: 80
+  },
+  {
+    name: 'calibration',
+    model: { ...buildReceiptModel({ invoice, business, branch, user, prefs: calibrated })!, showRuler: true },
+    paper: 80
+  },
   { name: 'receipt-58mm', model: buildReceiptModel({ invoice, business, branch, user, prefs: { ...DEFAULT_PRINT_PREFS, paperWidth: 58 } })!, paper: 58 },
   { name: 'receipt-duplicate', model: buildReceiptModel({ invoice, business, branch, user, prefs: DEFAULT_PRINT_PREFS }, { duplicate: true })!, paper: 80 }
 ] as const

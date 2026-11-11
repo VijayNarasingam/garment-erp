@@ -12,7 +12,19 @@ export const DEFAULT_PRINT_PREFS: PrintPrefs = {
   autoPrint: false,
   copies: 1,
   paperWidth: 80,
-  fontSize: 'normal'
+  fontSize: 'normal',
+  columnsByPrinter: {}
+}
+
+/** Printable widths a thermal printer can manage, in characters per line. */
+export const COLUMN_PRESETS = [48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 24]
+
+export function clampColumns(value: unknown): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  const rounded = Math.round(parsed)
+  if (rounded <= 0) return 0
+  return Math.min(64, Math.max(24, rounded))
 }
 
 export function clampCopies(value: unknown): number {
@@ -30,6 +42,12 @@ export function normalizeAgentUrl(value: unknown): string {
 
 export function normalizePrintPrefs(value: unknown): PrintPrefs {
   const source = value && typeof value === 'object' ? (value as Partial<PrintPrefs>) : {}
+  const columnsByPrinter: Record<string, number> = {}
+  const rawColumns = (source.columnsByPrinter ?? {}) as Record<string, unknown>
+  for (const [printer, columns] of Object.entries(rawColumns)) {
+    const clamped = clampColumns(columns)
+    if (printer && clamped > 0) columnsByPrinter[printer] = clamped
+  }
   return {
     version: 1,
     agentUrl: normalizeAgentUrl(source.agentUrl),
@@ -42,8 +60,15 @@ export function normalizePrintPrefs(value: unknown): PrintPrefs {
     fontSize:
       source.fontSize === 'small' || source.fontSize === 'large' || source.fontSize === 'normal'
         ? source.fontSize
-        : 'normal'
+        : 'normal',
+    columnsByPrinter
   }
+}
+
+/** Characters per line for a printer: the calibrated value, or 0 for "auto". */
+export function columnsForPrinter(prefs: PrintPrefs, printer: string): number {
+  if (!printer) return 0
+  return clampColumns(prefs.columnsByPrinter?.[printer] ?? 0)
 }
 
 export function loadPrintPrefs(storage: Pick<Storage, 'getItem'> | null = safeStorage()): PrintPrefs {

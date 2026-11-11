@@ -124,6 +124,22 @@ small ESC/POS interpreter and writes `frontend/print-preview/` — `receipt.bin`
 picture of the 80 mm roll, plus the 58 mm and duplicate variants). Use it after
 changing the receipt template.
 
+## Calibrate the paper width
+
+Some printers print fewer characters per line than the driver claims: a roll
+printer with wide margins, or a 58 mm printer in a condensed font, can wrap at
+42 characters while Windows believes the paper is 72 mm (48 characters). When
+the bill is wider than the paper really is, the printer cuts the line and an
+amount ends up split over two lines (`2,` / `498.00`).
+
+1. In the app open **Settings → Bill print**, choose the thermal printer and
+   press **Test print**. The test bill starts with a ruler line
+   (`1234567890…`).
+2. Read the last digit that stays on the first ruler line — that is how many
+   characters the printer really fits.
+3. Under **Advanced → Characters per line**, pick that number. The setting is
+   remembered per printer, so the label printer keeps its own value.
+
 ## Troubleshooting
 
 **The app says "Agent not running".**

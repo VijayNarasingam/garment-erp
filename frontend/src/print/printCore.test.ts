@@ -3,6 +3,7 @@ import type { BranchInfo, BusinessInfo, CreateSaleRequest, Customer, Invoice, Us
 import type { CartLine, SaleTotals } from '../lib/pos'
 import {
   buildEscPos,
+  CALIBRATION_RULER,
   columnsFor,
   foldAscii,
   formatAmount,
@@ -21,6 +22,8 @@ import {
 import {
   DEFAULT_AGENT_URL,
   DEFAULT_PRINT_PREFS,
+  clampColumns,
+  columnsForPrinter,
   loadPrintPrefs,
   normalizeAgentUrl,
   normalizePrintPrefs,
@@ -380,6 +383,30 @@ describe('layoutReceipt', () => {
     expect(lines.some((line) => line.trim() === '04-03-2026 10:05')).toBe(true)
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(32)
   })
+
+  it('uses a calibrated character width instead of the paper preset', () => {
+    const model = baseModel({ columns: 42 })
+    expect(columnsFor(model)).toBe(42)
+    const lines = layoutReceipt(model).map((line) => line.text)
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(42)
+    // The amount stays whole on one line instead of being split by the printer.
+    expect(lines).toContain(pad('  2 x 500.00  -100.00', '900.00', 42))
+    expect(lines.some((line) => line.endsWith('900.00') && line.length === 42)).toBe(true)
+  })
+
+  it('ignores a calibrated width that is out of range', () => {
+    expect(columnsFor(baseModel({ columns: 0 }))).toBe(48)
+    expect(columnsFor(baseModel({ columns: 200 }))).toBe(48)
+    expect(columnsFor(baseModel({ columns: 10 }))).toBe(48)
+  })
+
+  it('prints the calibration ruler for the test print', () => {
+    const lines = layoutReceipt(baseModel({ showRuler: true })).map((line) => line.text)
+    expect(lines).toContain('PRINTER WIDTH TEST')
+    expect(lines).toContain(CALIBRATION_RULER)
+    // The ruler is longer than any paper on purpose, so the break shows the width.
+    expect(CALIBRATION_RULER.length).toBeGreaterThan(48)
+  })
 })
 
 describe('upiUri', () => {
@@ -706,6 +733,18 @@ describe('print preferences', () => {
     )
     expect(saved.copies).toBe(3)
     expect(JSON.parse(written['garment.print.prefs.v1'])).toMatchObject({ copies: 3, paperWidth: 58 })
+  })
+
+  it('remembers a calibrated width per printer', () => {
+    expect(clampColumns(42)).toBe(42)
+    expect(clampColumns(0)).toBe(0)
+    expect(clampColumns(500)).toBe(64)
+    expect(clampColumns(10)).toBe(24)
+
+    const prefs = normalizePrintPrefs({ columnsByPrinter: { 'RP 3220 star': 42, 'Broken': 0, Other: 900 } })
+    expect(prefs.columnsByPrinter).toEqual({ 'RP 3220 star': 42, Other: 64 })
+    expect(columnsForPrinter(prefs, 'RP 3220 star')).toBe(42)
+    expect(columnsForPrinter(prefs, 'Some Other Printer')).toBe(0)
   })
 })
 

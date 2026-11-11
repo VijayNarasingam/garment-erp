@@ -112,31 +112,37 @@ function Test-LabelPrinter($name, $driverName) {
     return (($name -match $pattern) -or ($driverName -match $pattern))
 }
 
+function Get-PaperInfo {
+    param([string]$Printer)
+    $info = [pscustomobject]@{ paperWidthMm = 0; suggestedColumns = 0 }
+    try {
+        Add-Type -AssemblyName System.Drawing -ErrorAction SilentlyContinue
+        $settings = New-Object System.Drawing.Printing.PrinterSettings
+        $settings.PrinterName = $Printer
+        $size = $settings.PaperSize
+        if ($size -and $size.Width -gt 0) {
+            $mm = [math]::Round($size.Width * 0.254, 1)
+            $dots = [math]::Round($mm / 25.4 * 203)
+            $info.paperWidthMm = $mm
+            $info.suggestedColumns = [math]::Floor($dots / 12)
+        }
+    } catch {
+        # Not every driver reports a paper size. The calibration print covers it.
+    }
+    return $info
+}
+
 function Get-PrinterList {
     $items = @()
     $defaultName = $null
 
+    # Win32_Printer sees every installed printer, including drivers that the
+    # PrintManagement module skips (some ESC/POS roll drivers are one of them).
     try {
-        $default = Get-CimInstance -ClassName Win32_Printer -Filter 'Default = TRUE' -ErrorAction Stop |
-            Select-Object -First 1
+        $cim = @(Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop)
+        $default = $cim | Where-Object { $_.Default } | Select-Object -First 1
         if ($default) { $defaultName = $default.Name }
-    } catch {
-        Write-Log 'WARN' "Could not read the default printer: $($_.Exception.Message)"
-    }
-
-    try {
-        $items = Get-Printer -ErrorAction Stop | ForEach-Object {
-            [pscustomobject]@{
-                Name       = $_.Name
-                DriverName = $_.DriverName
-                PortName   = $_.PortName
-                Status     = [string]$_.PrinterStatus
-                Type       = [string]$_.Type
-            }
-        }
-    } catch {
-        Write-Log 'WARN' "Get-Printer unavailable, falling back to CIM: $($_.Exception.Message)"
-        $items = Get-CimInstance -ClassName Win32_Printer -ErrorAction SilentlyContinue | ForEach-Object {
+        $items = $cim | ForEach-Object {
             [pscustomobject]@{
                 Name       = $_.Name
                 DriverName = $_.DriverName
@@ -145,19 +151,49 @@ function Get-PrinterList {
                 Type       = if ($_.Network) { 'Network' } else { 'Local' }
             }
         }
+    } catch {
+        Write-Log 'WARN' "CIM printer list unavailable: $($_.Exception.Message)"
+    }
+
+    if ($items.Count -eq 0) {
+        try {
+            $items = Get-Printer -ErrorAction Stop | ForEach-Object {
+                [pscustomobject]@{
+                    Name       = $_.Name
+                    DriverName = $_.DriverName
+                    PortName   = $_.PortName
+                    Status     = [string]$_.PrinterStatus
+                    Type       = [string]$_.Type
+                }
+            }
+        } catch {
+            Write-Log 'WARN' "Get-Printer unavailable: $($_.Exception.Message)"
+        }
+    } else {
+        # The PrintManagement module has friendlier status words.
+        try {
+            $known = @{}
+            Get-Printer -ErrorAction Stop | ForEach-Object { $known[$_.Name] = $_ }
+            foreach ($item in $items) {
+                if ($known.ContainsKey($item.Name)) { $item.Status = [string]$known[$item.Name].PrinterStatus }
+            }
+        } catch { }
     }
 
     $result = @()
     foreach ($printer in $items) {
         if (-not $printer.Name) { continue }
+        $paper = Get-PaperInfo $printer.Name
         $result += [pscustomobject]@{
-            name           = $printer.Name
-            driverName     = $printer.DriverName
-            portName       = $printer.PortName
-            status         = $printer.Status
-            isDefault      = ($printer.Name -eq $defaultName)
-            isVirtual      = (Test-VirtualPrinter $printer.Name $printer.PortName)
-            isLabelPrinter = (Test-LabelPrinter $printer.Name $printer.DriverName)
+            name             = $printer.Name
+            driverName       = $printer.DriverName
+            portName         = $printer.PortName
+            status           = $printer.Status
+            isDefault        = ($printer.Name -eq $defaultName)
+            isVirtual        = (Test-VirtualPrinter $printer.Name $printer.PortName)
+            isLabelPrinter   = (Test-LabelPrinter $printer.Name $printer.DriverName)
+            paperWidthMm     = $paper.paperWidthMm
+            suggestedColumns = $paper.suggestedColumns
         }
     }
     return $result

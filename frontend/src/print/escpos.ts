@@ -41,10 +41,19 @@ export function formatAmount(value: number): string {
   return `${sign}${grouped}.${decimals}`
 }
 
-export function columnsFor(model: Pick<ReceiptModel, 'paperWidth' | 'fontSize'>): number {
+export function columnsFor(
+  model: Pick<ReceiptModel, 'paperWidth' | 'fontSize'> & { columns?: number }
+): number {
+  // A calibrated width always wins: the driver's paper size is often wider than
+  // what the printer really prints, and every extra column splits an amount.
+  if (model.columns && model.columns >= 24 && model.columns <= 64) return model.columns
   if (model.fontSize === 'small') return model.paperWidth === 80 ? 64 : 42
   return model.paperWidth === 80 ? 48 : 32
 }
+
+/** Digits used by the calibration ruler: the last visible digit is the width. */
+export const CALIBRATION_RULER =
+  '1234567890123456789012345678901234567890123456789012345678901234'
 
 export function wrapText(value: string, width: number): string[] {
   const clean = foldAscii(value).replace(/\s+/g, ' ').trim()
@@ -107,6 +116,16 @@ export function layoutReceipt(model: ReceiptModel): ReceiptLine[] {
     for (const line of wrapText(text, width)) push(line, { ...options, align: 'center' })
   }
   const separator = (character: string) => push(character.repeat(width))
+
+  if (model.showRuler) {
+    // The ruler is printed longer than the paper on purpose: where it breaks
+    // shows how many characters this printer really fits.
+    push('PRINTER WIDTH TEST', { bold: true })
+    push('Count the digits on the first ruler line.')
+    push(CALIBRATION_RULER)
+    push('|         |         |         |         |         |')
+    separator('-')
+  }
   /**
    * Label and amount on one line when they fit. On narrow paper the amount moves
    * to its own right-aligned line, so numbers are never split in the middle.

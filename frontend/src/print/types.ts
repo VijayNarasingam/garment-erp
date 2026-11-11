@@ -56,6 +56,10 @@ export interface ReceiptModel {
   cancelled: boolean
   paperWidth: PaperWidth
   fontSize: FontSize
+  /** Characters per line. Missing or 0 means "use the paper width preset". */
+  columns?: number
+  /** Adds the calibration ruler used by the test print. */
+  showRuler?: boolean
   invoiceNo: string
   invoiceDate: string
   shop: {
@@ -94,6 +98,8 @@ export interface PrintPrefs {
   copies: number
   paperWidth: PaperWidth
   fontSize: FontSize
+  /** Calibrated characters per line, remembered per printer. */
+  columnsByPrinter: Record<string, number>
 }
 
 export interface AgentHealth {
@@ -110,6 +116,10 @@ export interface AgentPrinter {
   isDefault: boolean
   isVirtual: boolean
   isLabelPrinter: boolean
+  /** Printable width the driver reports, in millimetres. 0 when unknown. */
+  paperWidthMm?: number
+  /** Characters per line the driver implies. 0 when unknown. */
+  suggestedColumns?: number
 }
 
 export interface AgentPrintersResponse {

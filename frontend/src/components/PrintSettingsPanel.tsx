@@ -14,6 +14,8 @@ import { Badge, Button, Field, Input, SectionCard, Select, Textarea } from '../c
 import { ReceiptDocument } from '../print/ReceiptDocument'
 import { usePrint } from '../print/PrintProvider'
 import { buildPreviewModel } from '../print/receiptModel'
+import { COLUMN_PRESETS, columnsForPrinter } from '../print/printPrefs'
+import { columnsFor } from '../print/escpos'
 import type { PaperWidth, FontSize } from '../print/types'
 
 /** The receipt fields the panel reads from the settings form. */
@@ -90,7 +92,31 @@ export function PrintSettingsPanel({ form, onChange, canEdit, saving, onSave }: 
     [form, business, branch, user, print.prefs]
   )
 
+  // The test print carries the calibration ruler so the real paper width can be
+  // read off the paper instead of guessed from the driver.
+  const testModel = useMemo(
+    () =>
+      buildPreviewModel(
+        {
+          form,
+          business,
+          branch,
+          user,
+          prefs: print.prefs
+        },
+        { ruler: true }
+      ),
+    [form, business, branch, user, print.prefs]
+  )
+
+  const calibratedColumns = columnsForPrinter(print.prefs, print.prefs.printer)
+  const autoColumns = columnsFor({ paperWidth: print.prefs.paperWidth, fontSize: print.prefs.fontSize })
+
   const selectedPrinter = print.printers.find((printer) => printer.name === print.prefs.printer)
+  const driverHint =
+    selectedPrinter && selectedPrinter.suggestedColumns
+      ? `Driver reports about ${selectedPrinter.suggestedColumns} characters per line (${selectedPrinter.paperWidthMm} mm printable). Trust the test print ruler over this.`
+      : null
   const printerWarning = selectedPrinter?.isLabelPrinter
     ? 'This looks like the label or barcode printer. Bills printed there will be wrong.'
     : selectedPrinter?.isVirtual
@@ -159,10 +185,10 @@ export function PrintSettingsPanel({ form, onChange, canEdit, saving, onSave }: 
   async function handleTestPrint() {
     setTesting(true)
     try {
-      const outcome = await print.testPrint(preview)
+      const outcome = await print.testPrint(testModel)
       if (outcome.status === 'sent') {
         toast.push('Test bill sent', {
-          description: `${outcome.printer ?? print.prefs.printer} · check the paper, QR and cut.`,
+          description: `${outcome.printer ?? print.prefs.printer} · check the ruler, the QR and the cut.`,
           tone: 'success'
         })
       } else {
@@ -174,6 +200,15 @@ export function PrintSettingsPanel({ form, onChange, canEdit, saving, onSave }: 
     } finally {
       setTesting(false)
     }
+  }
+
+  function setColumns(value: number) {
+    const printer = print.prefs.printer
+    if (!printer) return
+    const next = { ...print.prefs.columnsByPrinter }
+    if (value > 0) next[printer] = value
+    else delete next[printer]
+    print.updatePrefs({ columnsByPrinter: next })
   }
 
   const busy = connecting || testing || print.busy
@@ -333,6 +368,21 @@ export function PrintSettingsPanel({ form, onChange, canEdit, saving, onSave }: 
               </Field>
             </div>
 
+            {driverHint && (
+              <p className="rounded-lg bg-ivory-100/70 px-3 py-2 text-[10.5px] leading-4 text-ink-500">{driverHint}</p>
+            )}
+
+            {print.prefs.printer && calibratedColumns === 0 && (
+              <p className="flex items-start gap-2 rounded-lg border border-saffron-200 bg-saffron-100/70 px-3 py-2 text-[11px] leading-4 text-saffron-500">
+                <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                <span>
+                  Not calibrated yet. Press <strong>Test print</strong> and count the digits on the first ruler line, then
+                  set <strong>Characters per line</strong> under Advanced to that number. Until then an amount can be
+                  split across two lines.
+                </span>
+              </p>
+            )}
+
             {printerWarning && (
               <p className="flex items-start gap-2 rounded-lg border border-saffron-200 bg-saffron-100/70 px-3 py-2 text-[11px] leading-4 text-saffron-500">
                 <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {printerWarning}
@@ -450,6 +500,24 @@ export function PrintSettingsPanel({ form, onChange, canEdit, saving, onSave }: 
                       <option value="normal">Normal</option>
                       <option value="small">Small</option>
                       <option value="large">Large (double height)</option>
+                    </Select>
+                  </Field>
+                  <Field
+                    label="Characters per line"
+                    hint="Run Test print: if the ruler breaks before the end, count the digits on the first line and pick that number here. This stops amounts from splitting across two lines."
+                    className="sm:col-span-2"
+                  >
+                    <Select
+                      value={String(calibratedColumns)}
+                      onChange={(event) => setColumns(Number(event.target.value))}
+                      disabled={!canEdit || !print.prefs.printer}
+                    >
+                      <option value="0">Auto — {autoColumns} columns for {print.prefs.paperWidth} mm</option>
+                      {COLUMN_PRESETS.map((value) => (
+                        <option key={value} value={value}>
+                          {value} columns
+                        </option>
+                      ))}
                     </Select>
                   </Field>
                 </div>

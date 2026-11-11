@@ -2,6 +2,7 @@ import type { BranchInfo, BusinessInfo, Customer, Invoice, UserInfo } from '../l
 import type { CartLine, SaleTotals } from '../lib/pos'
 import { round2 } from '../lib/format'
 import type { OfflineSale } from '../lib/offline'
+import { columnsForPrinter } from './printPrefs'
 import type {
   PrintPrefs,
   ReceiptModel,
@@ -67,6 +68,7 @@ export function buildReceiptModel(
       ...offline.receiptSnapshot,
       paperWidth: prefs.paperWidth,
       fontSize: prefs.fontSize,
+      columns: columnsForPrinter(prefs, prefs.printer) || undefined,
       duplicate,
       cancelled
     }
@@ -98,6 +100,7 @@ export function buildReceiptModel(
       cancelled,
       paperWidth: prefs.paperWidth,
       fontSize: prefs.fontSize,
+      columns: columnsForPrinter(prefs, prefs.printer) || undefined,
       invoiceNo: exchange.returnNo ?? 'RETURN',
       invoiceDate: dateTimeLabel(new Date().toISOString()),
       shop: shopFor(business, branch),
@@ -161,6 +164,7 @@ function fromInvoice(
     cancelled,
     paperWidth: prefs.paperWidth,
     fontSize: prefs.fontSize,
+    columns: columnsForPrinter(prefs, prefs.printer) || undefined,
     invoiceNo: invoice.invoiceNo,
     invoiceDate: dateTimeLabel(invoice.postedAt ?? invoice.invoiceDate),
     shop: shopFor(business, branch, gstin),
@@ -240,6 +244,7 @@ function fromOffline(
     cancelled,
     paperWidth: prefs.paperWidth,
     fontSize: prefs.fontSize,
+    columns: columnsForPrinter(prefs, prefs.printer) || undefined,
     invoiceNo,
     invoiceDate: dateTimeLabel(sale.createdAt),
     shop: shopFor(business, branch),
@@ -342,13 +347,16 @@ export function buildOfflineSnapshot(input: OfflineSnapshotInput): ReceiptSnapsh
   }
 }
 
-export function buildPreviewModel(input: {
-  form: ReceiptSettingsLike
-  business: BusinessInfo | null
-  branch?: BranchInfo | null
-  user?: UserInfo | null
-  prefs: PrintPrefs
-}): ReceiptModel {
+export function buildPreviewModel(
+  input: {
+    form: ReceiptSettingsLike
+    business: BusinessInfo | null
+    branch?: BranchInfo | null
+    user?: UserInfo | null
+    prefs: PrintPrefs
+  },
+  options: { ruler?: boolean } = {}
+): ReceiptModel {
   const { form, branch, user, prefs } = input
   const shows = showsFor(form)
   const totals: ReceiptTotals = {
@@ -368,6 +376,8 @@ export function buildPreviewModel(input: {
     cancelled: false,
     paperWidth: prefs.paperWidth,
     fontSize: prefs.fontSize,
+    columns: columnsForPrinter(prefs, prefs.printer) || undefined,
+    showRuler: options.ruler === true,
     invoiceNo: `${form.invoicePrefix?.trim() || 'INV'}/2026-27/000123`,
     invoiceDate: dateTimeLabel(new Date().toISOString()),
     shop: {
