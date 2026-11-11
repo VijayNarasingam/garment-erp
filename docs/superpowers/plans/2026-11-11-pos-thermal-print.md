@@ -1,6 +1,6 @@
 # POS Thermal Bill Printing Implementation Plan
 
-> **For agentic workers:** Execute task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Silent 58/80 mm thermal bill printing through a local Windows print agent, with a configurable receipt template, UPI QR, duplicate reprints, and browser-print fallback.
 
@@ -33,69 +33,69 @@
 
 **Files:** entity, DTOs, service, auth DTO/mapping, `V2__receipt_print_settings.sql`, service test.
 
-- [ ] Add 13 fields with defaults (`receiptShowCustomer=true`, `Cashier`, `Payment`, `UpiQr`, `Terms`; `Sku/SizeColor/Hsn=false`; `ItemRate/ItemDiscount=true`; `receiptTerms`, `upiId`, `upiPayeeName`).
-- [ ] Extend `BusinessResponse` + `UpdateBusinessRequest` (UPI regex `^$|...`, sizes 100/150/500).
-- [ ] Persist and normalize blanks to null; include fields in audit snapshot and response; extend auth `BusinessInfo`.
-- [ ] Add H2 service unit test covering defaults, persistence and blank normalization.
-- [ ] `mvn test` and commit.
+- [x] Add 13 fields with defaults (`receiptShowCustomer=true`, `Cashier`, `Payment`, `UpiQr`, `Terms`; `Sku/SizeColor/Hsn=false`; `ItemRate/ItemDiscount=true`; `receiptTerms`, `upiId`, `upiPayeeName`).
+- [x] Extend `BusinessResponse` + `UpdateBusinessRequest` (UPI regex `^$|...`, sizes 100/150/500).
+- [x] Persist and normalize blanks to null; include fields in audit snapshot and response; extend auth `BusinessInfo`.
+- [x] Add H2 service unit test covering defaults, persistence and blank normalization.
+- [x] `mvn test` and commit.
 
 ### Task 2: Print core modules
 
 **Files:** `src/print/types.ts`, `printPrefs.ts`, `printAgent.ts`, `escpos.ts`, `receiptModel.ts` + tests.
 
-- [ ] Types: `ReceiptModel`, `ReceiptItem`, `ReceiptSnapshot`, `PrintPrefs`, `AgentPrinter`, `AgentError`.
-- [ ] Prefs: load/save/version/clamp, defaults `agentUrl=http://127.0.0.1:17890`, `copies=1`, `paperWidth=80`, `fontSize=normal`, `autoPrint=false`.
-- [ ] Agent client: health 1.5 s, printers 3 s, print 12 s, token header, `sent` flag on errors.
-- [ ] ESC/POS: widths 48/32/64/42, ASCII/CP437 folding + control stripping, Indian amounts, `Rs.`, item lines, tax split, QR via `GS ( k`, cut `GS V 66 0`, base64 helper.
-- [ ] Receipt model: invoice/offline/exchange mapping, tax groups, intra/inter state, discounts total, line amount `lineTotal`, UPI URI, terms default, offline snapshot builder, sample preview model.
-- [ ] Vitest tests for wrapping, folding, totals, tax split, UPI URI, snapshot, prefs.
-- [ ] `npm run test:unit` and commit.
+- [x] Types: `ReceiptModel`, `ReceiptItem`, `ReceiptSnapshot`, `PrintPrefs`, `AgentPrinter`, `AgentError`.
+- [x] Prefs: load/save/version/clamp, defaults `agentUrl=http://127.0.0.1:17890`, `copies=1`, `paperWidth=80`, `fontSize=normal`, `autoPrint=false`.
+- [x] Agent client: health 1.5 s, printers 3 s, print 12 s, token header, `sent` flag on errors.
+- [x] ESC/POS: widths 48/32/64/42, ASCII/CP437 folding + control stripping, Indian amounts, `Rs.`, item lines, tax split, QR via `GS ( k`, cut `GS V 66 0`, base64 helper.
+- [x] Receipt model: invoice/offline/exchange mapping, tax groups, intra/inter state, discounts total, line amount `lineTotal`, UPI URI, terms default, offline snapshot builder, sample preview model.
+- [x] Vitest tests for wrapping, folding, totals, tax split, UPI URI, snapshot, prefs.
+- [x] `npm run test:unit` and commit.
 
 ### Task 3: Provider and receipt UI
 
 **Files:** `ReceiptDocument.tsx`, `PrintProvider.tsx`, `useReceiptPrint.ts`, `main.tsx`, `index.css`.
 
-- [ ] `ReceiptDocument` renders `layoutReceipt` lines at paper width, with bold/centre/large styles and QR image.
-- [ ] `PrintProvider` owns prefs, health, printers, hidden `#print-root`, browser print, agent print policy, test print.
-- [ ] `useReceiptPrint` binds business/branch/user/prefs into model creation and print calls.
-- [ ] Print CSS: paper widths, duplicate banner, QR, no fixed page width.
-- [ ] `npm run build` and commit.
+- [x] `ReceiptDocument` renders `layoutReceipt` lines at paper width, with bold/centre/large styles and QR image.
+- [x] `PrintProvider` owns prefs, health, printers, hidden `#print-root`, browser print, agent print policy, test print.
+- [x] `useReceiptPrint` binds business/branch/user/prefs into model creation and print calls.
+- [x] Print CSS: paper widths, duplicate banner, QR, no fixed page width.
+- [x] `npm run build` and commit.
 
 ### Task 4: Settings panel
 
 **Files:** `components/PrintSettingsPanel.tsx`, `pages/SettingsPage.tsx`, `lib/types.ts`.
 
-- [ ] Extend `BusinessInfo`/`BusinessSettings` with 13 fields and `BusinessForm` + save body.
-- [ ] Panel: agent status, pairing, refresh/list/select printer, copies, auto-print, test print, content toggles, UPI/terms, Advanced (paper/font/SKU/size/colour/HSN/agent URL/label/show-all), mobile notice.
-- [ ] Live `ReceiptDocument` preview with current unsaved form values.
-- [ ] Keep existing shop fields and one save action.
-- [ ] `npm run build` and commit.
+- [x] Extend `BusinessInfo`/`BusinessSettings` with 13 fields and `BusinessForm` + save body.
+- [x] Panel: agent status, pairing, refresh/list/select printer, copies, auto-print, test print, content toggles, UPI/terms, Advanced (paper/font/SKU/size/colour/HSN/agent URL/label/show-all), mobile notice.
+- [x] Live `ReceiptDocument` preview with current unsaved form values.
+- [x] Keep existing shop fields and one save action.
+- [x] `npm run build` and commit.
 
 ### Task 5: Billing integration
 
 **Files:** `pages/PosPage.tsx`, `components/InvoiceDetail.tsx`, `lib/offline.ts`.
 
-- [ ] Store `ReceiptSnapshot` on queued offline sales.
-- [ ] Replace hand-built receipt with `ReceiptDocument`; add print status row and Print/Retry/Browser print/PDF/Next bill actions.
-- [ ] Auto-print once per receipt after success, desktop only; manual print fallback.
-- [ ] Reprint from invoice detail with `duplicate: true`, 1 copy, Retry/Browser fallback; keep PDF download.
-- [ ] `npm run build` and commit.
+- [x] Store `ReceiptSnapshot` on queued offline sales.
+- [x] Replace hand-built receipt with `ReceiptDocument`; add print status row and Print/Retry/Browser print/PDF/Next bill actions.
+- [x] Auto-print once per receipt after success, desktop only; manual print fallback.
+- [x] Reprint from invoice detail with `duplicate: true`, 1 copy, Retry/Browser fallback; keep PDF download.
+- [x] `npm run build` and commit.
 
 ### Task 6: Windows print agent
 
 **Files:** `printer-agent/agent.ps1`, `install.ps1`, `uninstall.ps1`, `README.md`.
 
-- [ ] HTTP listener with CORS, PNA preflight, host check, token auth, rate limit, body limit.
-- [ ] `/health`, `/printers` (virtual/label detection), `/print` (raw C# spooler, copies, warnings).
-- [ ] Installer: copy, config/token, URL ACL, hidden logon task, start + health poll; uninstaller.
-- [ ] README install/pair/test/troubleshoot. Commit.
+- [x] HTTP listener with CORS, PNA preflight, host check, token auth, rate limit, body limit.
+- [x] `/health`, `/printers` (virtual/label detection), `/print` (raw C# spooler, copies, warnings).
+- [x] Installer: copy, config/token, URL ACL, hidden logon task, start + health poll; uninstaller.
+- [x] README install/pair/test/troubleshoot. Commit.
 
 ### Task 7: Verification
 
-- [ ] Backend `mvn test`; frontend `npm run build`; `npm run test:unit`.
-- [ ] Playwright settings/agent mock tests + existing 6 tests.
-- [ ] Manual hardware checklist documented; report what needs the real printer.
-- [ ] Commit tests/docs.
+- [x] Backend `mvn test`; frontend `npm run build`; `npm run test:unit`.
+- [x] Playwright settings/agent mock tests + existing 6 tests.
+- [x] Manual hardware checklist documented; report what needs the real printer.
+- [x] Commit tests/docs.
 
 ## Interfaces
 
@@ -106,3 +106,31 @@
 - `usePrint(): { prefs, updatePrefs, health, printers, refreshPrinters, connect, testPrint, printReceipt, printBrowser }`
 - `printReceipt(model, mode: 'auto' | 'manual'): Promise<PrintOutcome>`
 - Agent `POST /print` body `{ printer, jobName, dataBase64, copies }`.
+
+---
+
+## Verification status (2026-11-11)
+
+| Check | Result |
+| --- | --- |
+| `mvn test` (backend) | 21 tests pass, including `BusinessReceiptSettingsTest` |
+| `npm run test:unit` (Vitest) | 34 tests pass (`frontend/src/print/printCore.test.ts`) |
+| `npm run build` (tsc + Vite) | passes |
+| `npx playwright test` | 9 tests pass (6 existing + 3 new print tests with a mocked agent) |
+| Print agent HTTP contract | verified locally on `127.0.0.1`: `/health` ok, `/printers` lists printers and flags virtual/label devices, `/print` rejects unknown printers (404), bad base64 (400), bad copy counts (400), missing token (401) and the CORS/PNA preflight (204) |
+| Raw spooler | the Win32 `StartDocPrinter` helper compiles and reaches the spooler; a real job was spooled to a null-device printer end to end |
+
+### Still needs the real hardware
+
+1. Install the vendor ESC/POS driver for the 80 mm thermal printer, then run
+   `printer-agent\install.ps1` as administrator on the billing PC.
+2. Pair the till in `Settings > Bill print` and press **Test print**.
+3. Check the paper: shop header, item lines, totals, the UPI QR (native `GS ( k`),
+   the cut (`GS V 66 0`) and the tear-off position.
+4. Confirm the bill never reaches the label printer and that the 58 mm setting is
+   ignored by an 80 mm-only printer.
+5. Post a real bill with auto-print on, then a reprint from the invoice detail
+   (must say `*** DUPLICATE ***` and print exactly one copy).
+6. Post a bill while the server is unreachable (offline queue) and print it.
+7. Flyway `V2__receipt_print_settings.sql` still has to run against the MySQL
+   profile; the local and test profiles use `ddl-auto` and never run it.
