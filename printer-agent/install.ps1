@@ -160,6 +160,20 @@ if ($healthy) {
 Write-Host ''
 Write-Host 'Pairing token (paste in Settings > Bill print):' -ForegroundColor Cyan
 Write-Host ("  {0}" -f $token) -ForegroundColor White
+
+# Keep the token and the outcome on disk: the window that runs the installer
+# closes when it is done, and the token is needed to pair the till.
+$token | Set-Content -LiteralPath (Join-Path $InstallDir 'pairing.txt') -Encoding ASCII
+@(
+    "installedAt = $(Get-Date -Format 'o')"
+    "installDir  = $InstallDir"
+    "port        = $Port"
+    "url         = http://127.0.0.1:$Port/"
+    "token       = $token"
+    "agentUp     = $healthy"
+    "taskName    = GarmentPrintAgent"
+) | Set-Content -LiteralPath (Join-Path $InstallDir 'install.log') -Encoding UTF8
+
 Write-Host ''
 Write-Host 'Next steps:'
 Write-Host '  1. Open Settings > Bill print in the app.'
@@ -167,3 +181,4 @@ Write-Host '  2. Paste the token above and press Connect.'
 Write-Host '  3. Choose the 80 mm thermal printer (not the label printer).'
 Write-Host '  4. Press Test print and check the paper, the QR code and the cut.'
 Write-Host '  5. Turn on "Print bills automatically" when the test print is clean.'
+Write-Host ("  (The token is also saved in {0})" -f (Join-Path $InstallDir 'pairing.txt'))
