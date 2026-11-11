@@ -26,8 +26,19 @@ public class LoginRateLimiter {
     @Autowired
     public LoginRateLimiter(
             @Value("${app.security.login-rate-limit.max-attempts:30}") int maxAttempts,
-            @Value("${app.security.login-rate-limit.window-seconds:300}") long windowSeconds) {
-        this(maxAttempts, windowSeconds, System::currentTimeMillis);
+            @Value("${app.security.login-rate-limit.window-seconds:300}") long windowSeconds,
+            @Value("${server.forward-headers-strategy:none}") String forwardHeadersStrategy,
+            @Value("${server.tomcat.remote-ip-via-x-forwarded-for:false}") boolean tomcatRemoteIpViaXForwardedFor) {
+        this(maxAttempts, windowSeconds, System::currentTimeMillis, forwardHeadersStrategy, tomcatRemoteIpViaXForwardedFor);
+    }
+
+    LoginRateLimiter(int maxAttempts, long windowSeconds, LongSupplier clock,
+                     String forwardHeadersStrategy, boolean tomcatRemoteIpViaXForwardedFor) {
+        this.maxAttempts = Math.max(1, maxAttempts);
+        this.windowMillis = Math.max(1, windowSeconds) * 1000L;
+        this.clock = clock;
+        this.forwardHeadersStrategy = forwardHeadersStrategy;
+        this.tomcatRemoteIpViaXForwardedFor = tomcatRemoteIpViaXForwardedFor;
     }
 
     LoginRateLimiter(int maxAttempts, long windowSeconds, LongSupplier clock) {
@@ -58,10 +69,15 @@ public class LoginRateLimiter {
 
     private String clientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            String first = forwarded.split(",")[0].trim();
-            if (!first.isEmpty()) {
-                return first;
+        if (forwardHeadersStrategy != null && !forwardHeadersStrategy.equals("none")) {
+            if (forwarded != null && !forwarded.isBlank()) {
+                String first = forwarded.split(",")[0].trim();
+                if (!first.isEmpty()) {
+                    return first;
+                }
+            }
+            if (tomcatRemoteIpViaXForwardedFor && request.getAttribute("tomcat.remote.address") != null) {
+                return request.getAttribute("tomcat.remote.address").toString();
             }
         }
         return request.getRemoteAddr();

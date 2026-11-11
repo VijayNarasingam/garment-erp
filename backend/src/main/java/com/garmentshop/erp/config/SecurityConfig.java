@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.firewall.StrictHttpFirewall;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -32,6 +33,20 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AppProperties properties;
     private final ObjectMapper objectMapper;
+    private final @Value("${server.forward-headers-strategy:none}") String forwardHeadersStrategy;
+
+    @Bean
+    public StrictHttpFirewall httpFirewall() {
+        StrictHttpFirewall firewall = StrictHttpFirewall.instance();
+        firewall.setAllowUrlEncodedDoubleEncodedSlash(true);
+        firewall.setAllowUrlEncodedPercent(true);
+        firewall.setAllowThreePercentEncoding(true);
+        firewall.setAllowSemicolon(true);
+        firewall.setAllowBackSlash(true);
+        firewall.setAllowAbsoluteHttpVersion(true);
+        firewall.setAllowUnquotedSlash(false);
+        return firewall;
+    }
 
     @Value("${springdoc.api-docs.enabled:true}")
     private boolean apiDocsEnabled;
@@ -51,6 +66,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+                .firewall(httpFirewall())
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers("/api/auth/login").permitAll()
                             .requestMatchers("/api/public/**", "/actuator/health", "/actuator/health/**",

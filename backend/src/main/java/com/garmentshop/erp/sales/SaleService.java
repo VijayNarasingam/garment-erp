@@ -563,19 +563,21 @@ public class SaleService {
             }
             return;
         }
-        BigDecimal ratio = billDiscount.divide(lineNetTotal, 8, RoundingMode.HALF_UP);
+        // Use full precision for intermediate calculations to avoid cumulative
+        // rounding drift. Round to 2dp only when storing values (Money.of handles it).
+        BigDecimal ratio = billDiscount.divide(lineNetTotal, 12, RoundingMode.HALF_UP);
         BigDecimal allocatedTotal = BigDecimal.ZERO;
         for (int i = 0; i < lines.size(); i++) {
             Line line = lines.get(i);
             BigDecimal allocated = i == lines.size() - 1
                     ? billDiscount.subtract(allocatedTotal)
-                    : Money.of(line.lineTotalBefore.multiply(ratio));
+                    : line.lineTotalBefore.multiply(ratio);
             allocatedTotal = allocatedTotal.add(allocated);
             BigDecimal factor = BigDecimal.ONE.subtract(ratio);
             line.taxable = Money.of(line.taxableBefore.multiply(factor));
             line.tax = Money.of(line.taxBefore.multiply(factor));
-            line.lineTotal = line.lineTotalBefore.subtract(allocated);
-            line.allocatedBillDiscount = allocated;
+            line.lineTotal = Money.of(line.lineTotalBefore.subtract(allocated));
+            line.allocatedBillDiscount = Money.of(allocated);
         }
     }
 

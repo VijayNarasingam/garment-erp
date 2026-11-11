@@ -11,8 +11,16 @@ public record AppProperties(
         boolean demoData,
         String seedPassword,
         Notification notification,
-        Backup backup
+        Backup backup,
+        Server server
 ) {
+    public record Server(
+            String forwardHeadersStrategy,
+            String tomcatRemoteIpHeader,
+            String tomcatProxiesHeader,
+            boolean trustLocalProxy
+    ) {
+    }
     public record Jwt(String secret, long expirationMinutes, String issuer) {
     }
 

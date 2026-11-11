@@ -287,7 +287,7 @@ public class ReportExportService {
                 Row dataRow = sheet.createRow(rowIndex++);
                 for (int i = 0; i < row.length; i++) {
                     Cell cell = dataRow.createCell(i);
-                    cell.setCellValue(row[i] == null ? "" : row[i]);
+                    cell.setCellValue(toCellValue(row[i]));
                     cell.setCellStyle(bodyStyle);
                 }
             }
@@ -295,7 +295,7 @@ public class ReportExportService {
                 Row dataRow = sheet.createRow(rowIndex++);
                 for (int i = 0; i < row.length; i++) {
                     Cell cell = dataRow.createCell(i);
-                    cell.setCellValue(row[i] == null ? "" : row[i]);
+                    cell.setCellValue(toCellValue(row[i]));
                     cell.setCellStyle(headerStyle);
                 }
             }
@@ -338,6 +338,16 @@ public class ReportExportService {
 
     private String money(BigDecimal value) {
         return Money.of(value).toPlainString();
+    }
+
+    private Object toCellValue(Object value) {
+        if (value == null) {
+            return "";
+        }
+        if (value instanceof BigDecimal bigDecimal) {
+            return bigDecimal.toPlainString();
+        }
+        return value.toString();
     }
 
     private String rate(BigDecimal value) {
