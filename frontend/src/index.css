@@ -250,8 +250,8 @@
 }
 
 .receipt-qr img {
-  width: 34mm;
-  height: 34mm;
+  width: var(--receipt-qr, 30mm);
+  height: var(--receipt-qr, 30mm);
 }
 
 .receipt-qr-missing {
@@ -297,8 +297,8 @@
     box-shadow: none !important;
   }
   .receipt-qr img {
-    width: 30mm;
-    height: 30mm;
+    width: var(--receipt-qr, 30mm);
+    height: var(--receipt-qr, 30mm);
   }
   @page {
     margin: 0;

@@ -16,6 +16,7 @@ interface PrintJob {
 /** Pretends the local Windows print agent is installed and healthy. */
 async function mockPrintAgent(page: Page) {
   const jobs: PrintJob[] = []
+  const columnRequests: { printer: string; columns: number }[] = []
 
   await page.route(`${AGENT_URL}/**`, async (route: Route) => {
     const request = route.request()
@@ -46,6 +47,12 @@ async function mockPrintAgent(page: Page) {
       await json({ status: 'ok', version: '1.0.0', uptimeSeconds: 42, queueDepth: 0 })
       return
     }
+    if (url.endsWith('/printer-columns')) {
+      const payload = request.postDataJSON() as { printer: string; columns: number }
+      columnRequests.push(payload)
+      await json({ printer: payload.printer, columns: payload.columns })
+      return
+    }
     if (url.endsWith('/printers')) {
       await json({
         defaultPrinter: PRINTER,
@@ -57,7 +64,10 @@ async function mockPrintAgent(page: Page) {
             status: 'Idle',
             isDefault: true,
             isVirtual: false,
-            isLabelPrinter: false
+            isLabelPrinter: false,
+            paperWidthMm: 0,
+            suggestedColumns: 0,
+            calibratedColumns: 42
           },
           {
             name: 'Zebra Label Printer',
@@ -81,7 +91,7 @@ async function mockPrintAgent(page: Page) {
     await route.fulfill({ status: 404, body: '{}' })
   })
 
-  return jobs
+  return { jobs, columnRequests }
 }
 
 async function signIn(page: Page) {
@@ -151,7 +161,7 @@ test.describe('Thermal bill printing', () => {
   })
 
   test('a paired agent is detected and a test print reaches it', async ({ page }) => {
-    const jobs = await mockPrintAgent(page)
+    const { jobs } = await mockPrintAgent(page)
     await pairTill(page)
     await openBillPrintSettings(page)
 
@@ -169,8 +179,33 @@ test.describe('Thermal bill printing', () => {
     expect(jobs[0].dataBase64.length).toBeGreaterThan(20)
   })
 
+  test('a measured paper width is stored with the printer and used by the bill', async ({ page }) => {
+    const { jobs, columnRequests } = await mockPrintAgent(page)
+    await pairTill(page)
+    await openBillPrintSettings(page)
+
+    await expect(page.getByText('Agent connected')).toBeVisible({ timeout: 15_000 })
+
+    // The agent reports the width that was measured on the paper.
+    await expect(page.getByLabel('Characters per line')).toHaveValue('42')
+    await expect(page.getByText(/Not calibrated yet/i)).toHaveCount(0)
+
+    // Changing it is remembered by the agent, so other browsers pick it up.
+    await page.getByLabel('Characters per line').selectOption('40')
+    await expect(page.getByText('Paper width set to 40 characters')).toBeVisible({ timeout: 10_000 })
+    expect(columnRequests).toEqual([{ printer: PRINTER, columns: 40 }])
+
+    // The receipt now fits the measured width: no line is longer than 40 characters.
+    const preview = page.locator('.receipt-document').first()
+    const widths = await preview.evaluate((element) =>
+      Array.from(element.querySelectorAll('.receipt-line')).map((line) => (line.textContent ?? '').length)
+    )
+    expect(Math.max(...widths)).toBeLessThanOrEqual(40)
+    expect(jobs).toHaveLength(0)
+  })
+
   test('a posted bill is printed silently through the agent', async ({ page }) => {
-    const jobs = await mockPrintAgent(page)
+    const { jobs } = await mockPrintAgent(page)
     await pairTill(page, { autoPrint: true })
     await signIn(page)
     await page.getByRole('button', { name: /billing/i }).click()

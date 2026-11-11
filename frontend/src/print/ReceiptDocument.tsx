@@ -42,6 +42,8 @@ export function ReceiptDocument({ model, qrDataUrl, preview = false, className }
 
   const qr = qrDataUrl ?? generatedQr
   const paper = model.paperWidth === 58 ? '58mm' : '80mm'
+  // Keep the preview close to the paper: bigger modules mean a bigger code.
+  const qrMm = model.qrSize && model.qrSize >= 7 ? 38 : model.qrSize && model.qrSize <= 4 ? 22 : 30
 
   return (
     <div
@@ -52,7 +54,7 @@ export function ReceiptDocument({ model, qrDataUrl, preview = false, className }
       {lines.map((line, index) => {
         if (line.qr) {
           return (
-            <div key={`qr-${index}`} className="receipt-qr">
+            <div key={`qr-${index}`} className="receipt-qr" style={{ ['--receipt-qr' as string]: `${qrMm}mm` } as CSSProperties}>
               {qr ? <img src={qr} alt="UPI payment QR code" /> : <span className="receipt-qr-missing">QR</span>}
             </div>
           )

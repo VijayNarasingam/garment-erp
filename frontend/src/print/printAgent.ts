@@ -96,3 +96,23 @@ export function agentPrint(
     sentOnTimeout: true
   }) as Promise<AgentPrintResponse>
 }
+
+/**
+ * Stores the measured characters per line with the printer, so every browser on
+ * this PC uses the same width.
+ */
+export function agentSetColumns(
+  baseUrl: string,
+  token: string,
+  printer: string,
+  columns: number,
+  timeout = 5000
+): Promise<{ printer: string; columns: number }> {
+  return request(baseUrl, '/printer-columns', {
+    method: 'POST',
+    token,
+    body: { printer, columns },
+    timeout,
+    sentOnTimeout: false
+  }) as Promise<{ printer: string; columns: number }>
+}

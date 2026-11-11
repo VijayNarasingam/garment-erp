@@ -278,6 +278,12 @@ function qrCommand(data: string, moduleSize: number): number[] {
   ]
 }
 
+/** Module size in dots: bigger modules make the QR easier to scan. */
+export function qrModuleSize(model: Pick<ReceiptModel, 'qrSize' | 'paperWidth'>): number {
+  if (model.qrSize && model.qrSize >= 3 && model.qrSize <= 10) return model.qrSize
+  return model.paperWidth === 80 ? 6 : 5
+}
+
 export function buildEscPos(model: ReceiptModel): Uint8Array {
   const bytes: number[] = []
   const command = (...values: number[]) => bytes.push(...values)
@@ -295,7 +301,7 @@ export function buildEscPos(model: ReceiptModel): Uint8Array {
       command(0x1b, 0x61, 0x01)
       command(0x1d, 0x21, 0x00)
       command(0x1b, 0x45, 0x00)
-      command(...qrCommand(line.qr, model.paperWidth === 80 ? 4 : 3))
+      command(...qrCommand(line.qr, qrModuleSize(model)))
       continue
     }
     command(0x1b, 0x61, line.align === 'center' ? 0x01 : line.align === 'right' ? 0x02 : 0x00)

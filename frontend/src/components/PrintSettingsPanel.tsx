@@ -14,7 +14,7 @@ import { Badge, Button, Field, Input, SectionCard, Select, Textarea } from '../c
 import { ReceiptDocument } from '../print/ReceiptDocument'
 import { usePrint } from '../print/PrintProvider'
 import { buildPreviewModel } from '../print/receiptModel'
-import { COLUMN_PRESETS, columnsForPrinter } from '../print/printPrefs'
+import { COLUMN_PRESETS, QR_SIZE_PRESETS, columnsForPrinter } from '../print/printPrefs'
 import { columnsFor } from '../print/escpos'
 import type { PaperWidth, FontSize } from '../print/types'
 
@@ -202,13 +202,27 @@ export function PrintSettingsPanel({ form, onChange, canEdit, saving, onSave }: 
     }
   }
 
-  function setColumns(value: number) {
+  async function setColumns(value: number) {
     const printer = print.prefs.printer
     if (!printer) return
-    const next = { ...print.prefs.columnsByPrinter }
-    if (value > 0) next[printer] = value
-    else delete next[printer]
-    print.updatePrefs({ columnsByPrinter: next })
+    try {
+      await print.setPrinterColumns(printer, value)
+      toast.push(
+        value > 0 ? `Paper width set to ${value} characters` : 'Paper width back to automatic',
+        {
+          description:
+            value > 0
+              ? 'Saved with the printer, so every browser on this PC prints the same way.'
+              : 'The paper width preset is used again.',
+          tone: 'success'
+        }
+      )
+    } catch {
+      toast.push('Could not save the paper width', {
+        description: 'The measurement was kept in this browser only.',
+        tone: 'warning'
+      })
+    }
   }
 
   const busy = connecting || testing || print.busy
@@ -368,6 +382,26 @@ export function PrintSettingsPanel({ form, onChange, canEdit, saving, onSave }: 
               </Field>
             </div>
 
+            {print.prefs.printer && (
+              <Field
+                label="Characters per line"
+                hint="Press Test print and count the digits on the first ruler line. If it stops early, choose that number here — otherwise the printer cuts amounts in half."
+              >
+                <Select
+                  value={String(calibratedColumns)}
+                  onChange={(event) => void setColumns(Number(event.target.value))}
+                  disabled={!canEdit}
+                >
+                  <option value="0">Auto — {autoColumns} columns for {print.prefs.paperWidth} mm</option>
+                  {COLUMN_PRESETS.map((value) => (
+                    <option key={value} value={value}>
+                      {value} columns
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+
             {driverHint && (
               <p className="rounded-lg bg-ivory-100/70 px-3 py-2 text-[10.5px] leading-4 text-ink-500">{driverHint}</p>
             )}
@@ -503,19 +537,18 @@ export function PrintSettingsPanel({ form, onChange, canEdit, saving, onSave }: 
                     </Select>
                   </Field>
                   <Field
-                    label="Characters per line"
-                    hint="Run Test print: if the ruler breaks before the end, count the digits on the first line and pick that number here. This stops amounts from splitting across two lines."
+                    label="QR code size"
+                    hint="Bigger modules scan more easily. 6 is a good middle ground."
                     className="sm:col-span-2"
                   >
                     <Select
-                      value={String(calibratedColumns)}
-                      onChange={(event) => setColumns(Number(event.target.value))}
-                      disabled={!canEdit || !print.prefs.printer}
+                      value={String(print.prefs.qrSize)}
+                      onChange={(event) => print.updatePrefs({ qrSize: Number(event.target.value) })}
+                      disabled={!canEdit}
                     >
-                      <option value="0">Auto — {autoColumns} columns for {print.prefs.paperWidth} mm</option>
-                      {COLUMN_PRESETS.map((value) => (
+                      {QR_SIZE_PRESETS.map((value) => (
                         <option key={value} value={value}>
-                          {value} columns
+                          {value} dots {value <= 4 ? '— small' : value >= 8 ? '— large' : '— medium'}
                         </option>
                       ))}
                     </Select>

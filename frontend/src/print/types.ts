@@ -58,6 +58,8 @@ export interface ReceiptModel {
   fontSize: FontSize
   /** Characters per line. Missing or 0 means "use the paper width preset". */
   columns?: number
+  /** QR module size in printer dots. */
+  qrSize?: number
   /** Adds the calibration ruler used by the test print. */
   showRuler?: boolean
   invoiceNo: string
@@ -100,6 +102,8 @@ export interface PrintPrefs {
   fontSize: FontSize
   /** Calibrated characters per line, remembered per printer. */
   columnsByPrinter: Record<string, number>
+  /** QR module size in printer dots (4, 6 or 8). */
+  qrSize: number
 }
 
 export interface AgentHealth {
@@ -120,6 +124,8 @@ export interface AgentPrinter {
   paperWidthMm?: number
   /** Characters per line the driver implies. 0 when unknown. */
   suggestedColumns?: number
+  /** Characters per line measured on the paper and stored by the agent. */
+  calibratedColumns?: number
 }
 
 export interface AgentPrintersResponse {

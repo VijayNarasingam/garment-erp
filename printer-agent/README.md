@@ -64,7 +64,10 @@ All responses are JSON. The token goes in the `X-Print-Agent-Token` header.
       "status": "Idle",
       "isDefault": true,
       "isVirtual": false,
-      "isLabelPrinter": false
+      "isLabelPrinter": false,
+      "paperWidthMm": 0,
+      "suggestedColumns": 0,
+      "calibratedColumns": 42
     }
   ]
 }
@@ -72,6 +75,23 @@ All responses are JSON. The token goes in the `X-Print-Agent-Token` header.
 
 `isVirtual` marks PDF/XPS printers. `isLabelPrinter` is a name and driver
 heuristic — the app shows a warning when a bill is sent to one.
+`calibratedColumns` is the width measured on the paper and stored with the
+printer (see below); `0` means "not measured yet".
+
+### `POST /printer-columns`
+
+Stores the measured characters per line with the printer, so every browser on
+this PC prints the same way.
+
+```json
+{ "printer": "XP-80C", "columns": 42 }
+```
+
+```json
+{ "printer": "XP-80C", "columns": 42 }
+```
+
+Send `columns: 0` to forget the measurement and fall back to the paper preset.
 
 ### `POST /print`
 
@@ -137,8 +157,11 @@ amount ends up split over two lines (`2,` / `498.00`).
    (`1234567890…`).
 2. Read the last digit that stays on the first ruler line — that is how many
    characters the printer really fits.
-3. Under **Advanced → Characters per line**, pick that number. The setting is
-   remembered per printer, so the label printer keeps its own value.
+3. Under **Characters per line**, pick that number. The setting is remembered
+   per printer, so the label printer keeps its own value.
+
+The measurement is stored in the agent (`config.json`) and picked up by every
+browser on this PC, so it only has to be done once.
 
 ## Troubleshooting
 

@@ -26,6 +26,18 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# The installer usually runs in a window that closes when it is done, so a
+# failure is written next to the agent for the next person to read.
+trap {
+    $message = "FAILED at {0}: {1}" -f (Get-Date -Format 'o'), $_.Exception.Message
+    try {
+        New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+        $message | Add-Content -LiteralPath (Join-Path $InstallDir 'install.log') -Encoding UTF8
+    } catch { }
+    Write-Host $message -ForegroundColor Red
+    break
+}
+
 function Test-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -63,7 +75,20 @@ $agentPath = Join-Path $InstallDir 'agent.ps1'
 Copy-Item -LiteralPath $agentSource -Destination $agentPath -Force
 Write-Host "  Agent installed at $agentPath"
 
-# --- 2. Raw spooler helper --------------------------------------------------
+# --- 2. Stop the running agent ----------------------------------------------
+# It holds the port and locks RawSpooler.dll, so it has to go before the new
+# files are put in place.
+$taskName = 'GarmentPrintAgent'
+Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*$InstallDir\agent.ps1*" } |
+    ForEach-Object {
+        Write-Host "  Stopping the running agent (pid $($_.ProcessId))"
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+Start-Sleep -Seconds 2
+
+# --- 3. Raw spooler helper --------------------------------------------------
 $agentText = Get-Content -LiteralPath $agentPath -Raw
 $match = [regex]::Match($agentText, "(?s)\`$script:RawSpoolerSource = @'\r?\n(.*?)\r?\n'@")
 if (-not $match.Success) {
@@ -71,7 +96,16 @@ if (-not $match.Success) {
 }
 $spoolerSource = $match.Groups[1].Value
 $spoolerDll = Join-Path $InstallDir 'RawSpooler.dll'
-if (Test-Path -LiteralPath $spoolerDll) { Remove-Item -LiteralPath $spoolerDll -Force }
+if (Test-Path -LiteralPath $spoolerDll) {
+    try { Remove-Item -LiteralPath $spoolerDll -Force -ErrorAction Stop } catch {
+        Write-Host "  Could not remove the old RawSpooler.dll ($($_.Exception.Message))."
+    }
+}
+if (Test-Path -LiteralPath $spoolerDll) {
+    # The old copy is still locked: build a fresh one beside it and use that.
+    $spoolerDll = Join-Path $InstallDir 'RawSpooler.new.dll'
+    if (Test-Path -LiteralPath $spoolerDll) { Remove-Item -LiteralPath $spoolerDll -Force }
+}
 try {
     Add-Type -TypeDefinition $spoolerSource -Language CSharp -OutputAssembly $spoolerDll -OutputType Library -ReferencedAssemblies 'System.dll' -ErrorAction Stop
 } catch {
@@ -79,13 +113,15 @@ try {
 }
 Write-Host "  Raw spooler compiled to $spoolerDll"
 
-# --- 3. Config --------------------------------------------------------------
+# --- 4. Config --------------------------------------------------------------
 $configPath = Join-Path $InstallDir 'config.json'
 $token = $null
+$existingColumns = $null
 if (Test-Path -LiteralPath $configPath) {
     try {
         $existing = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
         if (-not $ResetToken) { $token = $existing.token }
+        if ($existing.PSObject.Properties.Name -contains 'columns') { $existingColumns = $existing.columns }
     } catch { }
 }
 if (-not $token) {
@@ -100,10 +136,15 @@ if (-not $token) {
     token = $token
     installedAt = (Get-Date).ToString('o')
     version = '1.0.0'
-} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $configPath -Encoding UTF8
+    # Measured paper widths per printer survive a reinstall.
+    columns = if ($existingColumns) { $existingColumns } else { [pscustomobject]@{} }
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $configPath -Encoding UTF8
+# The agent runs as this user and has to save the measured paper width.
+$account = "$env:USERDOMAIN\$env:USERNAME"
+& icacls $configPath /grant "${account}:(M)" | Out-Null
 Write-Host "  Config written to $configPath"
 
-# --- 4. URL reservation -----------------------------------------------------
+# --- 5. URL reservation -----------------------------------------------------
 $prefix = "http://127.0.0.1:$Port/"
 netsh http delete urlacl url=$prefix | Out-Null
 $account = "$env:USERDOMAIN\$env:USERNAME"
@@ -113,8 +154,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  Reserved $prefix for $account"
 
-# --- 5. Scheduled task ------------------------------------------------------
-$taskName = 'GarmentPrintAgent'
+# --- 6. Scheduled task ------------------------------------------------------
 $psExe = Join-Path $PSHOME 'powershell.exe'
 if (-not (Test-Path -LiteralPath $psExe)) { $psExe = (Get-Process -Id $PID).Path }
 
@@ -131,7 +171,7 @@ Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Pr
     -Settings $settings -Description 'Garment ERP local thermal bill print agent (loopback only).' -Force | Out-Null
 Write-Host "  Scheduled task '$taskName' registered (hidden, starts at logon)"
 
-# --- 6. Start and verify ----------------------------------------------------
+# --- 7. Start and verify ----------------------------------------------------
 $healthy = $false
 if (-not $NoStart) {
     Start-ScheduledTask -TaskName $taskName

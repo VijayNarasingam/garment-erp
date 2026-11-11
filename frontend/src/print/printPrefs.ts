@@ -13,11 +13,21 @@ export const DEFAULT_PRINT_PREFS: PrintPrefs = {
   copies: 1,
   paperWidth: 80,
   fontSize: 'normal',
-  columnsByPrinter: {}
+  columnsByPrinter: {},
+  qrSize: 6
 }
 
 /** Printable widths a thermal printer can manage, in characters per line. */
 export const COLUMN_PRESETS = [48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 24]
+
+/** QR module sizes in printer dots. Bigger modules scan more reliably. */
+export const QR_SIZE_PRESETS = [4, 5, 6, 7, 8]
+
+export function clampQrSize(value: unknown): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 6
+  return Math.min(10, Math.max(3, Math.round(parsed)))
+}
 
 export function clampColumns(value: unknown): number {
   const parsed = Number(value)
@@ -61,7 +71,8 @@ export function normalizePrintPrefs(value: unknown): PrintPrefs {
       source.fontSize === 'small' || source.fontSize === 'large' || source.fontSize === 'normal'
         ? source.fontSize
         : 'normal',
-    columnsByPrinter
+    columnsByPrinter,
+    qrSize: clampQrSize(source.qrSize)
   }
 }
 

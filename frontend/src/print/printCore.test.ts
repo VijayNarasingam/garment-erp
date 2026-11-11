@@ -8,6 +8,7 @@ import {
   foldAscii,
   formatAmount,
   layoutReceipt,
+  qrModuleSize,
   row,
   toBase64,
   upiUri,
@@ -406,6 +407,19 @@ describe('layoutReceipt', () => {
     expect(lines).toContain(CALIBRATION_RULER)
     // The ruler is longer than any paper on purpose, so the break shows the width.
     expect(CALIBRATION_RULER.length).toBeGreaterThan(48)
+  })
+
+  it('prints a QR big enough to scan', () => {
+    expect(qrModuleSize(baseModel())).toBe(6)
+    expect(qrModuleSize({ paperWidth: 58 })).toBe(5)
+    expect(qrModuleSize({ paperWidth: 80, qrSize: 8 })).toBe(8)
+
+    // GS ( k 3 0 1 43 <module size> carries the module size.
+    const bytes = buildEscPos(baseModel({ qrSize: 8 }))
+    const marker = [0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43]
+    const at = bytes.findIndex((_, index) => marker.every((value, offset) => bytes[index + offset] === value))
+    expect(at).toBeGreaterThan(0)
+    expect(bytes[at + marker.length]).toBe(8)
   })
 })
 

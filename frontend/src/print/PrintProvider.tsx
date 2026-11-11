@@ -10,7 +10,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import QRCode from 'qrcode'
-import { AgentError, agentHealth, agentPrinters, agentPrint } from './printAgent'
+import { AgentError, agentHealth, agentPrinters, agentPrint, agentSetColumns } from './printAgent'
 import { buildEscPos, layoutReceipt, toBase64 } from './escpos'
 import { clampCopies, loadPrintPrefs, normalizeAgentUrl, savePrintPrefs } from './printPrefs'
 import { ReceiptDocument } from './ReceiptDocument'
@@ -40,6 +40,8 @@ export interface PrintContextValue {
   refreshPrinters: () => Promise<AgentPrinter[]>
   connect: (token: string, agentUrl?: string) => Promise<AgentPrinter[]>
   testPrint: (model: ReceiptModel) => Promise<PrintOutcome>
+  /** Stores the measured width with the printer in the agent and in this browser. */
+  setPrinterColumns: (printer: string, columns: number) => Promise<void>
   printReceipt: (
     model: ReceiptModel,
     mode: PrintMode,
@@ -113,6 +115,21 @@ export function PrintProvider({ children }: { children: ReactNode }) {
       setDefaultPrinter(result.defaultPrinter)
       setStatus('online')
       setLastError(null)
+
+      // The agent keeps the measured width with the printer, so every browser on
+      // this PC prints the same way.
+      const measured: Record<string, number> = {}
+      for (const printer of result.printers) {
+        if (printer.calibratedColumns && printer.calibratedColumns > 0) {
+          measured[printer.name] = printer.calibratedColumns
+        }
+      }
+      if (Object.keys(measured).length > 0) {
+        const merged = { ...prefsRef.current.columnsByPrinter, ...measured }
+        if (JSON.stringify(merged) !== JSON.stringify(prefsRef.current.columnsByPrinter)) {
+          updatePrefs({ columnsByPrinter: merged })
+        }
+      }
 
       const current = prefsRef.current.printer
       const stillThere = result.printers.some((printer) => printer.name === current)
@@ -270,6 +287,23 @@ export function PrintProvider({ children }: { children: ReactNode }) {
     [openBrowserPrint, runExclusive, sendToAgent]
   )
 
+  const setPrinterColumns = useCallback(
+    async (printer: string, columns: number) => {
+      const next = { ...prefsRef.current.columnsByPrinter }
+      if (columns > 0) next[printer] = columns
+      else delete next[printer]
+      updatePrefs({ columnsByPrinter: next })
+      // Keep the measurement with the printer, so other browsers pick it up.
+      try {
+        await agentSetColumns(prefsRef.current.agentUrl, prefsRef.current.token, printer, columns)
+      } catch (error) {
+        setLastError(error instanceof Error ? error.message : 'The agent could not store the width.')
+        throw error
+      }
+    },
+    [updatePrefs]
+  )
+
   const testPrint = useCallback(
     (model: ReceiptModel) => runExclusive(() => sendToAgent({ ...model, duplicate: false, cancelled: false }, 1)),
     [runExclusive, sendToAgent]
@@ -301,6 +335,7 @@ export function PrintProvider({ children }: { children: ReactNode }) {
       refreshPrinters,
       connect,
       testPrint,
+      setPrinterColumns,
       printReceipt,
       printBrowser
     }),
@@ -318,6 +353,7 @@ export function PrintProvider({ children }: { children: ReactNode }) {
       refreshPrinters,
       connect,
       testPrint,
+      setPrinterColumns,
       printReceipt,
       printBrowser
     ]

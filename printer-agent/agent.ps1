@@ -50,12 +50,34 @@ $script:ScriptPath = $MyInvocation.MyCommand.Path
 function Get-AgentConfig {
     if (Test-Path -LiteralPath $script:ConfigPath) {
         try {
-            return Get-Content -LiteralPath $script:ConfigPath -Raw | ConvertFrom-Json
+            $config = Get-Content -LiteralPath $script:ConfigPath -Raw | ConvertFrom-Json
+            if (-not $config.PSObject.Properties.Name -contains 'columns') {
+                $config | Add-Member -NotePropertyName columns -NotePropertyValue ([pscustomobject]@{}) -Force
+            }
+            return $config
         } catch {
             Write-Log 'ERROR' "config.json could not be read: $($_.Exception.Message)"
         }
     }
-    return [pscustomobject]@{ port = 17890; host = '127.0.0.1'; token = '' }
+    return [pscustomobject]@{ port = 17890; host = '127.0.0.1'; token = ''; columns = [pscustomobject]@{} }
+}
+
+function Save-AgentConfig($config) {
+    $config | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $script:ConfigPath -Encoding UTF8
+}
+
+function Get-CalibratedColumns {
+    param($Config, [string]$Printer)
+    if (-not $Printer) { return 0 }
+    try {
+        $value = $Config.columns.$Printer
+        if ($null -eq $value) { return 0 }
+        $number = [int]$value
+        if ($number -lt 24 -or $number -gt 64) { return 0 }
+        return $number
+    } catch {
+        return 0
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -133,6 +155,7 @@ function Get-PaperInfo {
 }
 
 function Get-PrinterList {
+    param($Config)
     $items = @()
     $defaultName = $null
 
@@ -185,15 +208,16 @@ function Get-PrinterList {
         if (-not $printer.Name) { continue }
         $paper = Get-PaperInfo $printer.Name
         $result += [pscustomobject]@{
-            name             = $printer.Name
-            driverName       = $printer.DriverName
-            portName         = $printer.PortName
-            status           = $printer.Status
-            isDefault        = ($printer.Name -eq $defaultName)
-            isVirtual        = (Test-VirtualPrinter $printer.Name $printer.PortName)
-            isLabelPrinter   = (Test-LabelPrinter $printer.Name $printer.DriverName)
-            paperWidthMm     = $paper.paperWidthMm
-            suggestedColumns = $paper.suggestedColumns
+            name               = $printer.Name
+            driverName         = $printer.DriverName
+            portName           = $printer.PortName
+            status             = $printer.Status
+            isDefault          = ($printer.Name -eq $defaultName)
+            isVirtual          = (Test-VirtualPrinter $printer.Name $printer.PortName)
+            isLabelPrinter     = (Test-LabelPrinter $printer.Name $printer.DriverName)
+            paperWidthMm       = $paper.paperWidthMm
+            suggestedColumns   = $paper.suggestedColumns
+            calibratedColumns  = (Get-CalibratedColumns $Config $printer.Name)
         }
     }
     return $result
@@ -561,7 +585,7 @@ function Ensure-Worker {
 }
 
 function Invoke-PrintJob {
-    param($Context, $Body)
+    param($Context, $Body, $Config)
 
     try {
         $json = [System.Text.Encoding]::UTF8.GetString([byte[]]$Body)
@@ -578,7 +602,7 @@ function Invoke-PrintJob {
         return
     }
 
-    $known = @(Get-PrinterList | Where-Object { $_.name -eq $printer })
+    $known = @(Get-PrinterList $Config | Where-Object { $_.name -eq $printer })
     if ($known.Count -eq 0) {
         Send-Error $Context 404 'UNKNOWN_PRINTER' "The printer '$printer' is not installed on this PC."
         return
@@ -705,12 +729,59 @@ function Invoke-Agent {
 
             switch ($path) {
                 '/printers' {
-                    $printers = @(Get-PrinterList)
+                    $printers = @(Get-PrinterList $config)
                     $default = $printers | Where-Object { $_.isDefault } | Select-Object -First 1
                     Send-Json $context 200 ([pscustomobject]@{
                         defaultPrinter = if ($default) { $default.name } else { $null }
                         printers       = $printers
                     })
+                }
+                '/printer-columns' {
+                    if ($method -ne 'POST') {
+                        Send-Error $context 405 'METHOD_NOT_ALLOWED' 'Use POST for /printer-columns.'
+                        break
+                    }
+                    $body = $null
+                    try {
+                        $body = Get-RequestBody $context
+                    } catch {
+                        Send-Error $context 400 'INVALID_REQUEST' 'The request body could not be read.'
+                        break
+                    }
+                    try {
+                        $request = ([System.Text.Encoding]::UTF8.GetString([byte[]]$body)) | ConvertFrom-Json
+                    } catch {
+                        Send-Error $context 400 'INVALID_JSON' 'The request body is not valid JSON.'
+                        break
+                    }
+                    $printer = [string](Get-PropertyValue $request 'printer' '')
+                    if (-not $printer) {
+                        Send-Error $context 400 'INVALID_REQUEST' 'A printer name is required.'
+                        break
+                    }
+                    $columns = [int](Get-PropertyValue $request 'columns' 0)
+                    if ($columns -lt 0 -or $columns -gt 64) {
+                        Send-Error $context 400 'INVALID_COLUMNS' 'Columns must be between 0 and 64.'
+                        break
+                    }
+                    if ($columns -gt 0 -and $columns -lt 24) {
+                        Send-Error $context 400 'INVALID_COLUMNS' 'Columns must be at least 24.'
+                        break
+                    }
+                    if ($columns -gt 0) {
+                        $config.columns | Add-Member -NotePropertyName $printer -NotePropertyValue $columns -Force
+                    } else {
+                        $config.columns.PSObject.Properties.Remove($printer)
+                    }
+                    try {
+                        Save-AgentConfig $config
+                    } catch {
+                        # The measurement still applies to this browser even if the
+                        # agent cannot write its config file.
+                        Write-Log 'WARN' "Could not save the calibration: $($_.Exception.Message)"
+                    }
+                    Write-Log 'INFO' "Calibrated '$printer' to $columns characters per line."
+                    Send-Json $context 200 ([pscustomobject]@{ printer = $printer; columns = $columns })
                 }
                 '/print' {
                     if ($method -ne 'POST') {
@@ -728,7 +799,7 @@ function Invoke-Agent {
                         }
                         break
                     }
-                    Invoke-PrintJob $context $body
+                    Invoke-PrintJob $context $body $config
                 }
                 default {
                     Send-Error $context 404 'NOT_FOUND' "Unknown path '$path'."
