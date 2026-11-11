@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  AlertTriangle,
   ArrowLeftRight,
   Banknote,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   CloudOff,
   CreditCard,
+  Loader2,
   Minus,
   PauseCircle,
   Plus,
@@ -31,6 +33,11 @@ import { formatDate, formatDateTime, initials, money, statusTone, titleCase, tod
 import { buildSaleRequest, calculateSale, paymentMethods, type CartLine, type Charge, type Discount, type PaymentLine } from '../lib/pos'
 import { deviceIdForBranch, enqueueSale, getPull, listQueue, registerDevice, savePull, syncQueuedSales, type OfflineSale } from '../lib/offline'
 import { InvoiceDetailModal, type ReturnExchangeItem, type ReturnExchangePayload } from '../components/InvoiceDetail'
+import { ReceiptDocument } from '../print/ReceiptDocument'
+import { AgentError } from '../print/printAgent'
+import { buildOfflineSnapshot } from '../print/receiptModel'
+import { useReceiptPrint } from '../print/useReceiptPrint'
+import type { PrintOutcome, ReceiptModel } from '../print/types'
 import type { Customer, HeldBill, Invoice, PageResponse, Product, PullSnapshot, SalesReturn, StockRow } from '../lib/types'
 import {
   Badge,
@@ -64,11 +71,22 @@ function paletteFor(seed: string) {
   return palettes[hash % palettes.length]
 }
 
+interface ReceiptPrintStatus {
+  /** Invoice number of the receipt this status belongs to. */
+  key: string
+  state: 'printing' | 'sent' | 'browser' | 'error'
+  message: string
+  /** False when the job may already be on paper, so the fallback is explicit only. */
+  canFallback: boolean
+}
+
 export function PosPage() {
   const { branchId, branches, business, user, has } = useAuth()
   const toast = useToast()
   const queryClient = useQueryClient()
   const online = useOnline()
+  const receiptPrint = useReceiptPrint()
+  const [receiptPrintStatus, setReceiptPrintStatus] = useState<ReceiptPrintStatus | null>(null)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<string>('all')
   const [lines, setLines] = useState<CartLine[]>([])
@@ -114,6 +132,61 @@ export function PosPage() {
   const scanTimer = useRef<number>(0)
 
   const branch = branches.find((item) => item.id === branchId)
+
+  const applyPrintOutcome = (key: string, outcome: PrintOutcome) => {
+    if (outcome.status === 'busy') return
+    if (outcome.status === 'sent') {
+      const printer = outcome.printer ?? receiptPrint.prefs.printer
+      setReceiptPrintStatus({
+        key,
+        state: 'sent',
+        message: outcome.warning ? `Sent to ${printer}. ${outcome.warning}` : `Sent to ${printer}. Check the paper.`,
+        canFallback: false
+      })
+      return
+    }
+    if (outcome.status === 'browser' || outcome.status === 'browser-fallback') {
+      setReceiptPrintStatus({
+        key,
+        state: 'browser',
+        message: 'Browser print dialog opened. Pick the 80 mm thermal printer there.',
+        canFallback: false
+      })
+      return
+    }
+    const sent = outcome.error instanceof AgentError ? outcome.error.sent : outcome.status === 'failed'
+    setReceiptPrintStatus({
+      key,
+      state: 'error',
+      message: outcome.warning ?? 'The bill did not print.',
+      canFallback: !sent
+    })
+  }
+
+  /** Auto-print quietly after a bill. Failures stay inline and never open a dialog. */
+  const maybeAutoPrint = (model: ReceiptModel | null) => {
+    if (!model) return
+    const { autoPrint, token, printer } = receiptPrint.prefs
+    if (!autoPrint || !token || !printer) return
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) return
+    setReceiptPrintStatus({ key: model.invoiceNo, state: 'printing', message: 'Sending to the printer…', canFallback: false })
+    void receiptPrint.printReceipt(model, 'auto').then((outcome) => applyPrintOutcome(model.invoiceNo, outcome))
+  }
+
+  const manualPrint = async (model: ReceiptModel) => {
+    setReceiptPrintStatus({ key: model.invoiceNo, state: 'printing', message: 'Sending to the printer…', canFallback: false })
+    applyPrintOutcome(model.invoiceNo, await receiptPrint.printReceipt(model, 'manual'))
+  }
+
+  const retryPrint = async (model: ReceiptModel) => {
+    setReceiptPrintStatus({ key: model.invoiceNo, state: 'printing', message: 'Sending to the printer…', canFallback: false })
+    applyPrintOutcome(model.invoiceNo, await receiptPrint.printReceipt(model, 'auto'))
+  }
+
+  const browserPrint = async (model: ReceiptModel) => {
+    setReceiptPrintStatus({ key: model.invoiceNo, state: 'printing', message: 'Opening the browser print dialog…', canFallback: false })
+    applyPrintOutcome(model.invoiceNo, await receiptPrint.printBrowser(model))
+  }
 
   // Counters usually have a hardware scanner, but on phones auto-focus pops the
   // soft keyboard and covers half the catalogue — only focus on tablet/desktop.
@@ -521,6 +594,7 @@ export function PosPage() {
     onSuccess: (invoice) => {
       pendingSaleIdRef.current = null
       setReceipt({ invoice })
+      maybeAutoPrint(receiptPrint.buildModel({ invoice }))
       clearCart()
       setCartOpen(false)
       setApproverOpen(false)
@@ -663,16 +737,18 @@ export function PosPage() {
         return
       }
 
+      const exchangeReceipt = {
+        origin: returnCart.invoiceNo,
+        due: Math.max(0, totals.total - returnCreditTotal),
+        credit: returnCreditTotal,
+        lines: returnCart.items,
+        returnNo: returnsResponse.returnNo
+      }
       setReceipt({
         invoice: posted,
-        exchange: {
-          origin: returnCart.invoiceNo,
-          due: Math.max(0, totals.total - returnCreditTotal),
-          credit: returnCreditTotal,
-          lines: returnCart.items,
-          returnNo: returnsResponse.returnNo
-        }
+        exchange: exchangeReceipt
       })
+      if (posted) maybeAutoPrint(receiptPrint.buildModel({ invoice: posted, exchange: exchangeReceipt }))
       clearCart()
       setCartOpen(false)
       setReturnCart(null)
@@ -709,19 +785,33 @@ export function PosPage() {
       variantId: line.variantId,
       quantity: stockMap.get(line.variantId) ?? line.stock
     }))
+    const createdAt = new Date().toISOString()
     const offlineSale: OfflineSale = {
       offlineId,
       branchId,
-      createdAt: new Date().toISOString(),
+      createdAt,
       request,
       lastKnownStock,
       total: totals.total,
-      status: 'QUEUED'
+      status: 'QUEUED',
+      // Frozen now because the product names and tax split are not in the sync request.
+      receiptSnapshot: buildOfflineSnapshot({
+        offlineId,
+        createdAt,
+        request,
+        lines,
+        totals,
+        customer,
+        cashier: user?.fullName,
+        business,
+        branch
+      })
     }
     try {
       await enqueueSale(offlineSale)
       setQueueCount((count) => count + 1)
       setReceipt({ offline: offlineSale })
+      maybeAutoPrint(receiptPrint.buildModel({ offline: offlineSale }))
       clearCart()
       setCartOpen(false)
       toast.push('Saved offline', {
@@ -811,121 +901,12 @@ export function PosPage() {
 
   if (!branchId) return <LoadingBlock label="Choose a branch…" />
 
-  // One receipt body shared by the on-screen modal and the print-only portal (#print-root),
-  // so the paper exactly matches what was shown after the bill was posted.
-  const receiptBody = receipt ? (
-    <div className="print-receipt">
-      <div className="rounded-xl border border-line bg-ivory-50 p-5">
-        <div className="text-center">
-          <p className="font-display text-xl font-semibold text-ink-900">{business?.name}</p>
-          <p className="mt-1 text-[10px] text-ink-400">{branch?.name}</p>
-          {business?.address && (
-            <p className="whitespace-pre-line text-[10px] leading-4 text-ink-400">{business.address}</p>
-          )}
-          {business?.phone && <p className="text-[10px] text-ink-400">Contact: {business.phone}</p>}
-          {business?.gstEnabled && <p className="mt-0.5 font-mono text-[9px] text-ink-400">GSTIN {branch?.gstin ?? business.gstin}</p>}
-        </div>
-        <Divider className="my-3" />
-        <div className="flex justify-between text-[10px] text-ink-500">
-          <span>{receipt.invoice ? receipt.invoice.invoiceNo : receipt.offline?.offlineId.slice(0, 13)}</span>
-          <span>{formatDate(receipt.invoice?.invoiceDate ?? todayISO())}</span>
-        </div>
-        {receipt.invoice && (
-          <p className="mt-0.5 text-[10px] text-ink-400">
-            {receipt.invoice.customerName} · {receipt.invoice.createdByName}
-          </p>
-        )}
-        <Divider className="my-3" />
-        <div className="space-y-1.5">
-          {(receipt.invoice?.items ?? receipt.offline?.request.items ?? []).map((item: any, index: number) => (
-            <div key={index} className="flex items-start justify-between gap-2 text-[10.5px]">
-              <span className="min-w-0">
-                <span className="block truncate font-semibold text-ink-800">{item.productName ?? item.name ?? `Item ${index + 1}`}</span>
-                <span className="text-[9px] text-ink-400">
-                  {item.sku ?? ''} × {item.quantity}
-                </span>
-              </span>
-              <span className="num shrink-0 text-ink-700">
-                {money(
-                  receipt.invoice
-                    ? item.lineTotal + item.taxAmount
-                    : (item.unitPrice ?? 0) * item.quantity
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
-        <Divider className="my-3" />
-        <div className="flex items-baseline justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500">Total</span>
-          <span className="num font-display text-xl font-semibold text-ink-900">
-            {money(receipt.invoice?.total ?? receipt.offline?.total ?? 0)}
-          </span>
-        </div>
-        {receipt.invoice && (
-          <div className="mt-1 flex justify-between text-[10px] text-ink-500">
-            <span>{receipt.invoice.payments.map((payment) => titleCase(payment.method)).join(' + ') || 'Credit'}</span>
-            <span className="num">{money(receipt.invoice.paidAmount)}</span>
-          </div>
-        )}
-        {receipt.exchange && (
-          <>
-            <Divider className="my-3" />
-            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-saffron-600">
-              Exchange · vs {receipt.exchange.origin}
-            </p>
-            <div className="mt-1 space-y-1">
-              {receipt.exchange.lines.map((item) => (
-                <div key={item.invoiceItemId} className="flex items-start justify-between gap-2 text-[10px]">
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold text-ink-800">{item.productName}</span>
-                    <span className="text-[9px] text-ink-400">
-                      {item.sku} × −{item.quantity}
-                    </span>
-                  </span>
-                  <span className="num shrink-0 text-ink-700">({money(item.perUnit * item.quantity)})</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-1.5 space-y-1 text-[10px] text-ink-500">
-              <div className="flex justify-between">
-                <span>Return credit</span>
-                <span className="num">− {money(receipt.exchange.credit)}</span>
-              </div>
-              <div className="flex justify-between font-bold">
-                <span className="text-ink-800">Net paid</span>
-                <span className="num">{money(receipt.exchange.due)}</span>
-              </div>
-              {receipt.exchange.returnNo && (
-                <p className="text-[8.5px] text-ink-400">
-                  Return {receipt.exchange.returnNo} · routed for approval · new bill {receipt.invoice?.invoiceNo}
-                </p>
-              )}
-            </div>
-          </>
-        )}
-        <Divider className="my-3" />
-        <p className="text-center text-[9px] leading-4 text-ink-400">
-          {receipt.offline
-            ? 'Saved offline. This bill will be numbered and posted when the till syncs.'
-            : business?.thankYouNote || 'Thank you for shopping with us!'}
-        </p>
-      </div>
-    </div>
-  ) : null
-
-  // Hidden container on <body> that becomes the ONLY visible element while printing,
-  // so the app, overlays and repeated position:fixed copies never reach the paper.
-  let printTarget: HTMLElement | null = null
-  if (typeof document !== 'undefined') {
-    let el = document.getElementById('print-root')
-    if (!el) {
-      el = document.createElement('div')
-      el.id = 'print-root'
-      document.body.appendChild(el)
-    }
-    printTarget = el
-  }
+  // One receipt model drives both the modal preview and the ESC/POS paper.
+  const receiptModel = receipt
+    ? receiptPrint.buildModel({ invoice: receipt.invoice, offline: receipt.offline, exchange: receipt.exchange })
+    : null
+  const printStatus =
+    receiptModel && receiptPrintStatus?.key === receiptModel.invoiceNo ? receiptPrintStatus : null
 
   const filteredInvoiceList = useMemo(
     () =>
@@ -1823,26 +1804,48 @@ export function PosPage() {
         size="md"
         footer={
           <>
-            {receipt?.invoice && (
+            {receiptModel && (
               <>
-                <Button variant="secondary" size="sm" onClick={() => window.print()}>
-                  <Printer size={13} /> Print
-                </Button>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    const headers: Record<string, string> = {}
-                    const token = localStorage.getItem('garment.token')
-                    if (token) headers.Authorization = `Bearer ${token}`
-                    fetch(`/api/sales/invoices/${receipt.invoice!.id}/pdf`, { headers })
-                      .then((response) => response.blob())
-                      .then((blob) => window.open(URL.createObjectURL(blob), '_blank', 'noopener'))
-                      .catch(() => toast.push('PDF unavailable', { tone: 'error' }))
-                  }}
+                  disabled={printStatus?.state === 'printing'}
+                  onClick={() => void manualPrint(receiptModel)}
                 >
-                  PDF
+                  {printStatus?.state === 'printing' ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Printer size={13} />
+                  )}
+                  Print
                 </Button>
+                {printStatus?.state === 'error' && (
+                  <>
+                    <Button variant="secondary" size="sm" onClick={() => void retryPrint(receiptModel)}>
+                      Retry
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => void browserPrint(receiptModel)}>
+                      Browser print
+                    </Button>
+                  </>
+                )}
+                {receipt?.invoice && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const headers: Record<string, string> = {}
+                      const token = localStorage.getItem('garment.token')
+                      if (token) headers.Authorization = `Bearer ${token}`
+                      fetch(`/api/sales/invoices/${receipt.invoice!.id}/pdf`, { headers })
+                        .then((response) => response.blob())
+                        .then((blob) => window.open(URL.createObjectURL(blob), '_blank', 'noopener'))
+                        .catch(() => toast.push('PDF unavailable', { tone: 'error' }))
+                    }}
+                  >
+                    PDF
+                  </Button>
+                )}
               </>
             )}
             <Button size="sm" onClick={() => setReceipt(null)}>
@@ -1851,12 +1854,55 @@ export function PosPage() {
           </>
         }
       >
-        {receiptBody}
+        {receiptModel ? (
+          <div className="space-y-3">
+            <ReceiptPrintStatusRow status={printStatus} />
+            <div className="max-h-[62vh] overflow-y-auto rounded-xl border border-line bg-ivory-200/40 p-2 sm:p-3">
+              <ReceiptDocument model={receiptModel} preview />
+            </div>
+            {receipt?.offline && (
+              <p className="text-[10.5px] leading-4 text-ink-400">
+                Saved offline. This bill is queued and will be numbered when the till syncs.
+              </p>
+            )}
+          </div>
+        ) : null}
       </Modal>
-
-      {/* Print-only copy: goes to #print-root, which is the sole printable element. */}
-      {receiptBody && printTarget && createPortal(receiptBody, printTarget)}
     </div>
+  )
+}
+
+function ReceiptPrintStatusRow({ status }: { status: ReceiptPrintStatus | null }) {
+  if (!status) return null
+  if (status.state === 'printing') {
+    return (
+      <p className="flex items-center gap-2 rounded-lg border border-line-soft bg-ivory-100/70 px-3 py-2 text-[11px] font-medium text-ink-500">
+        <Loader2 size={13} className="animate-spin" /> {status.message}
+      </p>
+    )
+  }
+  if (status.state === 'sent') {
+    return (
+      <p className="flex items-center gap-2 rounded-lg border border-sage-200 bg-sage-100 px-3 py-2 text-[11px] font-medium text-sage-600">
+        <CheckCircle2 size={13} /> {status.message}
+      </p>
+    )
+  }
+  if (status.state === 'browser') {
+    return (
+      <p className="flex items-center gap-2 rounded-lg border border-line-soft bg-ivory-100/70 px-3 py-2 text-[11px] font-medium text-ink-500">
+        <Printer size={13} /> {status.message}
+      </p>
+    )
+  }
+  return (
+    <p className="flex items-start gap-2 rounded-lg border border-brick-300/50 bg-brick-100 px-3 py-2 text-[11px] leading-4 text-brick-600">
+      <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+      <span>
+        {status.message}
+        {!status.canFallback && ' Check the paper before printing again.'}
+      </span>
+    </p>
   )
 }
 

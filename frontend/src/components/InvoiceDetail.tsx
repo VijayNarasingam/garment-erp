@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeftRight, Ban, Check, Download, FileText, Printer, ReceiptText, RotateCcw } from 'lucide-react'
+import { ArrowLeftRight, Ban, Check, Download, FileText, Loader2, Printer, ReceiptText, RotateCcw } from 'lucide-react'
 import { api, downloadFile } from '../lib/api'
 import { formatDate, formatDateTime, money, statusTone, titleCase } from '../lib/format'
 import type { Invoice } from '../lib/types'
 import { Badge, Button, Divider, Field, LoadingBlock, Modal, Textarea } from './ui'
 import { useToast } from './toast'
 import { useAuth } from '../lib/auth'
+import { useReceiptPrint } from '../print/useReceiptPrint'
 
 export interface ReturnExchangeItem {
   invoiceItemId: number
@@ -43,10 +44,12 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPickReturn }: Invoice
   const toast = useToast()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const receiptPrint = useReceiptPrint()
   const [cancelOpen, setCancelOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [pickMode, setPickMode] = useState<false | 'return' | 'exchange'>(false)
   const [pickQty, setPickQty] = useState<Record<number, number>>({})
+  const [reprintState, setReprintState] = useState<{ state: 'printing' | 'error'; message: string } | null>(null)
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice', invoiceId],
@@ -131,20 +134,35 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPickReturn }: Invoice
     onError: (error: Error) => toast.push('Could not cancel invoice', { description: error.message, tone: 'error' })
   })
 
-  const openPdf = async () => {
-    try {
-      const headers: Record<string, string> = {}
-      const token = localStorage.getItem('garment.token')
-      if (token) headers.Authorization = `Bearer ${token}`
-      const response = await fetch(`/api/sales/invoices/${invoiceId}/pdf`, { headers })
-      if (!response.ok) throw new Error('PDF could not be generated')
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank', 'noopener')
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
-    } catch (error) {
-      toast.push('PDF unavailable', { description: (error as Error).message, tone: 'error' })
+  const printDuplicate = async (browser = false) => {
+    if (!invoice) return
+    const model = receiptPrint.buildModel(
+      { invoice },
+      { duplicate: true, cancelled: invoice.status === 'CANCELLED' }
+    )
+    if (!model) return
+    setReprintState({ state: 'printing', message: 'Sending 1 duplicate copy…' })
+    const outcome = browser
+      ? await receiptPrint.printBrowser(model)
+      : await receiptPrint.printReceipt(model, 'manual', { copies: 1 })
+
+    if (outcome.status === 'sent') {
+      setReprintState(null)
+      toast.push('Duplicate bill sent', {
+        description: `${outcome.printer ?? receiptPrint.prefs.printer} · 1 copy · marked DUPLICATE`,
+        tone: 'success'
+      })
+      return
     }
+    if (outcome.status === 'browser' || outcome.status === 'browser-fallback') {
+      setReprintState(null)
+      toast.push('Browser print dialog opened', {
+        description: 'The copy is marked *** DUPLICATE ***.',
+        tone: 'info'
+      })
+      return
+    }
+    setReprintState({ state: 'error', message: outcome.warning ?? 'The duplicate did not print.' })
   }
 
   return (
@@ -167,11 +185,35 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPickReturn }: Invoice
                 {titleCase(invoice.status)}
               </Badge>
               {invoice.source === 'OFFLINE' && <Badge tone="info">Synced offline</Badge>}
+              {reprintState?.state === 'error' && (
+                <span className="text-[10.5px] leading-4 text-brick-600">{reprintState.message}</span>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" size="sm" onClick={openPdf}>
-                <Printer size={13} /> Print
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void printDuplicate()}
+                disabled={reprintState?.state === 'printing'}
+                title="Prints one thermal copy marked DUPLICATE"
+              >
+                {reprintState?.state === 'printing' ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Printer size={13} />
+                )}
+                Reprint
               </Button>
+              {reprintState?.state === 'error' && (
+                <>
+                  <Button variant="secondary" size="sm" onClick={() => void printDuplicate()}>
+                    Retry
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => void printDuplicate(true)}>
+                    Browser print
+                  </Button>
+                </>
+              )}
               <Button
                 variant="secondary"
                 size="sm"

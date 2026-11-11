@@ -36,6 +36,7 @@ export interface ReceiptSettingsLike {
   gstin: string
   stateCode: string
   thankYouNote: string
+  invoicePrefix?: string
   receiptShowCustomer: boolean
   receiptShowCashier: boolean
   receiptShowPayment: boolean
@@ -367,7 +368,7 @@ export function buildPreviewModel(input: {
     cancelled: false,
     paperWidth: prefs.paperWidth,
     fontSize: prefs.fontSize,
-    invoiceNo: `${form.name ? 'INV' : 'INV'}/2026-27/000123`,
+    invoiceNo: `${form.invoicePrefix?.trim() || 'INV'}/2026-27/000123`,
     invoiceDate: dateTimeLabel(new Date().toISOString()),
     shop: {
       name: form.name || 'Shop name',

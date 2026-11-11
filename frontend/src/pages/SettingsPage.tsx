@@ -66,6 +66,7 @@ import {
   Textarea
 } from '../components/ui'
 import { useToast } from '../components/toast'
+import { PrintSettingsPanel } from '../components/PrintSettingsPanel'
 
 type Tab = 'profile' | 'offline' | 'business' | 'print' | 'branches' | 'users' | 'roles' | 'tax' | 'notifications' | 'backups'
 
@@ -103,6 +104,19 @@ interface BusinessForm {
   timezone: string
   costingMethod: string
   thankYouNote: string
+  receiptShowCustomer: boolean
+  receiptShowCashier: boolean
+  receiptShowPayment: boolean
+  receiptShowUpiQr: boolean
+  receiptShowTerms: boolean
+  receiptShowSku: boolean
+  receiptShowSizeColor: boolean
+  receiptShowHsn: boolean
+  receiptShowItemRate: boolean
+  receiptShowItemDiscount: boolean
+  receiptTerms: string
+  upiId: string
+  upiPayeeName: string
 }
 
 const toBusinessForm = (business: BusinessSettings): BusinessForm => ({
@@ -126,7 +140,20 @@ const toBusinessForm = (business: BusinessSettings): BusinessForm => ({
   allowNegativeStockWithApproval: business.allowNegativeStockWithApproval,
   timezone: business.timezone ?? '',
   costingMethod: business.costingMethod,
-  thankYouNote: business.thankYouNote ?? 'Thank you for shopping with us!'
+  thankYouNote: business.thankYouNote ?? 'Thank you for shopping with us!',
+  receiptShowCustomer: business.receiptShowCustomer !== false,
+  receiptShowCashier: business.receiptShowCashier !== false,
+  receiptShowPayment: business.receiptShowPayment !== false,
+  receiptShowUpiQr: business.receiptShowUpiQr !== false,
+  receiptShowTerms: business.receiptShowTerms !== false,
+  receiptShowSku: business.receiptShowSku === true,
+  receiptShowSizeColor: business.receiptShowSizeColor === true,
+  receiptShowHsn: business.receiptShowHsn === true,
+  receiptShowItemRate: business.receiptShowItemRate !== false,
+  receiptShowItemDiscount: business.receiptShowItemDiscount !== false,
+  receiptTerms: business.receiptTerms ?? '',
+  upiId: business.upiId ?? '',
+  upiPayeeName: business.upiPayeeName ?? ''
 })
 
 const emptyBranchForm = () => ({
@@ -430,7 +457,20 @@ export function SettingsPage() {
           maxDiscountPercent: Number(form.maxDiscountPercent || 0),
           allowNegativeStockWithApproval: form.allowNegativeStockWithApproval,
           timezone: form.timezone.trim() || null,
-          thankYouNote: form.thankYouNote.trim() || null
+          thankYouNote: form.thankYouNote.trim() || null,
+          receiptShowCustomer: form.receiptShowCustomer,
+          receiptShowCashier: form.receiptShowCashier,
+          receiptShowPayment: form.receiptShowPayment,
+          receiptShowUpiQr: form.receiptShowUpiQr,
+          receiptShowTerms: form.receiptShowTerms,
+          receiptShowSku: form.receiptShowSku,
+          receiptShowSizeColor: form.receiptShowSizeColor,
+          receiptShowHsn: form.receiptShowHsn,
+          receiptShowItemRate: form.receiptShowItemRate,
+          receiptShowItemDiscount: form.receiptShowItemDiscount,
+          receiptTerms: form.receiptTerms.trim() || null,
+          upiId: form.upiId.trim() || null,
+          upiPayeeName: form.upiPayeeName.trim() || null
         }
       })
     },
@@ -1236,72 +1276,13 @@ export function SettingsPage() {
             ) : businessQuery.isError ? (
               <EmptyState icon={ReceiptText} title="Could not load bill print settings" description={(businessQuery.error as Error).message} />
             ) : (
-              <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="space-y-4">
-                  <SectionCard title="What appears on the printed bill" description="Every printed bill and downloaded PDF shows these details. Edit them once here.">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Field label="Shop name" required hint="Header of every bill" className="sm:col-span-2">
-                        <Input value={businessForm.name} disabled={!has('settings.manage')} onChange={(event) => setBusinessForm({ ...businessForm, name: event.target.value })} />
-                      </Field>
-                      <Field label="Address" hint="Line by line, printed under the shop name" className="sm:col-span-2">
-                        <Textarea value={businessForm.address} disabled={!has('settings.manage')} onChange={(event) => setBusinessForm({ ...businessForm, address: event.target.value })} />
-                      </Field>
-                      <Field label="Contact number" hint="Phone printed with the address">
-                        <Input value={businessForm.phone} disabled={!has('settings.manage')} onChange={(event) => setBusinessForm({ ...businessForm, phone: event.target.value })} />
-                      </Field>
-                      <Field label="Bill number shows prefix">
-                        <Input value={businessForm.invoicePrefix} disabled={!has('settings.manage')} onChange={(event) => setBusinessForm({ ...businessForm, invoicePrefix: event.target.value.toUpperCase() })} />
-                      </Field>
-                      <Field
-                        label="Thank-you note (bottom of bill)"
-                        hint="Closing line, printed at the bottom"
-                        className="sm:col-span-2"
-                      >
-                        <Textarea
-                          value={businessForm.thankYouNote}
-                          disabled={!has('settings.manage')}
-                          onChange={(event) => setBusinessForm({ ...businessForm, thankYouNote: event.target.value })}
-                          placeholder="Thank you for shopping with us!"
-                        />
-                      </Field>
-                    </div>
-                    <p className="mt-3 text-[10.5px] leading-4 text-ink-400">
-                      Each bill always prints: bill number, date, seller (billed by), customer name and all product details, plus these shop details and the thank-you note.
-                    </p>
-                  </SectionCard>
-
-                  {has('settings.manage') && (
-                    <div className="flex justify-end">
-                      <Button loading={businessMutation.isPending} onClick={() => businessMutation.mutate()}>
-                        <Save size={14} /> Save bill print settings
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Live preview */}
-                <SectionCard title="Preview" description="Follows the values on the left.">
-                  <div className="mx-auto w-full max-w-[260px] rounded-lg border border-line bg-white p-3.5 font-mono text-[10px] leading-4 text-ink-800 shadow-sm">
-                    <p className="text-center font-display text-[13px] font-bold tracking-wide text-ink-900">{businessForm.name || 'Shop name'}</p>
-                    {(businessForm.address ?? '').split('\n').filter(Boolean).map((line, index) => (
-                      <p key={index} className="text-center text-[9px] text-ink-500">{line}</p>
-                    ))}
-                    {businessForm.phone && <p className="text-center text-[9px] text-ink-500">Contact: {businessForm.phone}</p>}
-                    <p className="my-2 border-t border-dashed border-ink-300" />
-                    <div className="flex justify-between"><span>Bill No</span><span className="font-bold">{businessForm.invoicePrefix}/2026-27/000123</span></div>
-                    <div className="flex justify-between"><span>Date</span><span>{new Date().toLocaleDateString('en-IN')}</span></div>
-                    <div className="flex justify-between mt-1"><span>Billed by</span><span className="font-bold">{user?.fullName}</span></div>
-                    <div className="flex justify-between"><span>Customer</span><span>Walk-in customer</span></div>
-                    <p className="my-2 border-t border-dashed border-ink-300" />
-                    <div className="flex justify-between"><span>Sample item x 1</span><span>1,099.00</span></div>
-                    <div className="mt-1.5 border-t border-dashed border-ink-300" />
-                    <div className="flex justify-between font-bold"><span>TOTAL</span><span>1,076.00</span></div>
-                    <p className="mt-2 border-t border-dashed border-ink-300 pt-1.5 text-center italic text-ink-600">
-                      {businessForm.thankYouNote.trim() || 'Thank you for shopping with us!'}
-                    </p>
-                  </div>
-                </SectionCard>
-              </div>
+              <PrintSettingsPanel
+                form={businessForm}
+                onChange={(patch) => setBusinessForm({ ...businessForm, ...patch })}
+                canEdit={has('settings.manage')}
+                saving={businessMutation.isPending}
+                onSave={() => businessMutation.mutate()}
+              />
             )}
           </div>
         )}

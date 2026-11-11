@@ -252,6 +252,8 @@ export function buildEscPos(model: ReceiptModel): Uint8Array {
 
   command(0x1b, 0x40)
   command(0x1b, 0x74, 0x00)
+  // The manual recommends CP437; Font B doubles the characters per line for the small setting.
+  command(0x1b, 0x4d, model.fontSize === 'small' ? 0x01 : 0x00)
 
   for (const line of layoutReceipt(model)) {
     if (line.qr) {
@@ -263,7 +265,8 @@ export function buildEscPos(model: ReceiptModel): Uint8Array {
     }
     command(0x1b, 0x61, line.align === 'center' ? 0x01 : line.align === 'right' ? 0x02 : 0x00)
     command(0x1b, 0x45, line.bold ? 0x01 : 0x00)
-    command(0x1d, 0x21, line.large ? 0x01 : 0x00)
+    // 0x10 = double height only, so the 48/32-column layout still fits.
+    command(0x1d, 0x21, line.large ? 0x10 : 0x00)
     text(line.text)
     bytes.push(0x0a)
   }

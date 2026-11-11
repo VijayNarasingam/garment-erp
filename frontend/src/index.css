@@ -193,6 +193,78 @@
   }
 }
 
+/* Thermal receipt: one document for the screen preview, the modal and browser print.
+   The monospace width is fixed per paper size so the HTML matches the ESC/POS columns. */
+.receipt-document {
+  --receipt-font-size: 9.6px;
+  width: var(--receipt-paper, 80mm);
+  margin: 0 auto;
+  padding: 3mm 2.5mm;
+  background: #fff;
+  color: #000;
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--receipt-font-size);
+  line-height: 1.34;
+  font-variant-ligatures: none;
+}
+
+.receipt-document[data-font='small'] {
+  --receipt-font-size: 7.2px;
+}
+
+.receipt-document-preview {
+  border-radius: 6px;
+  box-shadow:
+    0 18px 40px -24px rgba(25, 24, 22, 0.55),
+    0 0 0 1px rgba(25, 24, 22, 0.08);
+}
+
+.receipt-line {
+  white-space: pre;
+}
+
+.receipt-line-center {
+  text-align: center;
+}
+
+.receipt-line-right {
+  text-align: right;
+}
+
+.receipt-line-bold {
+  font-weight: 700;
+}
+
+/* Double height only, matching GS ! 0x10 on the printer. */
+.receipt-line-large {
+  font-weight: 700;
+  transform: scaleY(1.5);
+  transform-origin: center;
+  margin: 0.2em 0;
+}
+
+.receipt-qr {
+  display: flex;
+  justify-content: center;
+  padding: 1.5mm 0 1mm;
+}
+
+.receipt-qr img {
+  width: 34mm;
+  height: 34mm;
+}
+
+.receipt-qr-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34mm;
+  height: 34mm;
+  border: 1px dashed #999;
+  font-size: 10px;
+  color: #666;
+}
+
 /* Print pipeline: #print-root receives print-only markup (React portal). */
 #print-root {
   display: none;
@@ -217,20 +289,18 @@
   #print-root {
     display: block !important;
   }
-  .print-receipt {
-    width: 80mm;
-    margin: 0 auto;
-    padding: 4mm;
-    background: #fff;
-  }
-  .print-receipt .card,
-  .print-receipt > div {
-    border: none !important;
+  .receipt-document {
+    width: var(--receipt-paper, 80mm);
+    margin: 0;
+    padding: 1.5mm 2.5mm;
+    border-radius: 0 !important;
     box-shadow: none !important;
-    padding: 0 !important;
-    background: #fff !important;
+  }
+  .receipt-qr img {
+    width: 30mm;
+    height: 30mm;
   }
   @page {
-    margin: 6mm;
+    margin: 0;
   }
 }
