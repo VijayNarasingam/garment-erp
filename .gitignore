@@ -27,3 +27,10 @@ Thumbs.db
 # Logs and temp files
 *.log
 *.tmp
+
+# Local scratch scripts and debug screenshots (not part of the product)
+frontend/fiverr-*.cjs
+frontend/shot-*.cjs
+frontend/dt-dropdown*.png
+frontend/search-pos.png
+frontend/shot-*.png
