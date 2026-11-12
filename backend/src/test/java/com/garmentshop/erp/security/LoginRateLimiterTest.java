@@ -74,6 +74,21 @@ class LoginRateLimiterTest {
     }
 
     @Test
+    void ignoresForwardedHeaderWhenTheAppIsNotBehindAProxy() {
+        AtomicLong now = new AtomicLong(1_000);
+        LoginRateLimiter limiter = new LoginRateLimiter(1, 60, now::get, "none", "X-Forwarded-For");
+
+        MockHttpServletRequest spoofed = request("10.0.0.1");
+        spoofed.addHeader("X-Forwarded-For", "203.0.113.9");
+        limiter.checkAndRecord(spoofed);
+
+        MockHttpServletRequest sameClient = request("10.0.0.1");
+        sameClient.addHeader("X-Forwarded-For", "203.0.113.10");
+        assertThat(catchThrowableOfType(() -> limiter.checkAndRecord(sameClient), ApiException.class).getCode())
+                .isEqualTo("LOGIN_RATE_LIMITED");
+    }
+
+    @Test
     void allowsAgainAfterTheWindowExpires() {
         AtomicLong now = new AtomicLong(1_000);
         LoginRateLimiter limiter = new LoginRateLimiter(1, 60, now::get);

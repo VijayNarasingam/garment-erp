@@ -340,7 +340,7 @@ public class ReportExportService {
         return Money.of(value).toPlainString();
     }
 
-    private Object toCellValue(Object value) {
+    private String toCellValue(Object value) {
         if (value == null) {
             return "";
         }

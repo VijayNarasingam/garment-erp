@@ -17,9 +17,13 @@ import java.util.function.LongSupplier;
 @Component
 public class LoginRateLimiter {
 
+    private static final String DEFAULT_REMOTE_IP_HEADER = "X-Forwarded-For";
+
     private final int maxAttempts;
     private final long windowMillis;
     private final LongSupplier clock;
+    private final String forwardHeadersStrategy;
+    private final String remoteIpHeader;
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
     private final AtomicInteger calls = new AtomicInteger();
 
@@ -28,23 +32,26 @@ public class LoginRateLimiter {
             @Value("${app.security.login-rate-limit.max-attempts:30}") int maxAttempts,
             @Value("${app.security.login-rate-limit.window-seconds:300}") long windowSeconds,
             @Value("${server.forward-headers-strategy:none}") String forwardHeadersStrategy,
-            @Value("${server.tomcat.remote-ip-via-x-forwarded-for:false}") boolean tomcatRemoteIpViaXForwardedFor) {
-        this(maxAttempts, windowSeconds, System::currentTimeMillis, forwardHeadersStrategy, tomcatRemoteIpViaXForwardedFor);
+            @Value("${server.tomcat.remoteip.remote-ip-header:X-Forwarded-For}") String remoteIpHeader) {
+        this(maxAttempts, windowSeconds, System::currentTimeMillis, forwardHeadersStrategy, remoteIpHeader);
     }
 
     LoginRateLimiter(int maxAttempts, long windowSeconds, LongSupplier clock,
-                     String forwardHeadersStrategy, boolean tomcatRemoteIpViaXForwardedFor) {
+                     String forwardHeadersStrategy, String remoteIpHeader) {
         this.maxAttempts = Math.max(1, maxAttempts);
         this.windowMillis = Math.max(1, windowSeconds) * 1000L;
         this.clock = clock;
-        this.forwardHeadersStrategy = forwardHeadersStrategy;
-        this.tomcatRemoteIpViaXForwardedFor = tomcatRemoteIpViaXForwardedFor;
+        this.forwardHeadersStrategy = forwardHeadersStrategy == null ? "none" : forwardHeadersStrategy.trim();
+        this.remoteIpHeader = remoteIpHeader == null || remoteIpHeader.isBlank()
+                ? DEFAULT_REMOTE_IP_HEADER
+                : remoteIpHeader.trim();
     }
 
+    /**
+     * Convenience constructor for unit tests: forwarded headers are treated as trusted.
+     */
     LoginRateLimiter(int maxAttempts, long windowSeconds, LongSupplier clock) {
-        this.maxAttempts = Math.max(1, maxAttempts);
-        this.windowMillis = Math.max(1, windowSeconds) * 1000L;
-        this.clock = clock;
+        this(maxAttempts, windowSeconds, clock, "native", DEFAULT_REMOTE_IP_HEADER);
     }
 
     public void checkAndRecord(HttpServletRequest request) {
@@ -68,19 +75,28 @@ public class LoginRateLimiter {
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwardHeadersStrategy != null && !forwardHeadersStrategy.equals("none")) {
+        if (trustsForwardedHeaders()) {
+            String forwarded = request.getHeader(remoteIpHeader);
             if (forwarded != null && !forwarded.isBlank()) {
                 String first = forwarded.split(",")[0].trim();
                 if (!first.isEmpty()) {
                     return first;
                 }
             }
-            if (tomcatRemoteIpViaXForwardedFor && request.getAttribute("tomcat.remote.address") != null) {
-                return request.getAttribute("tomcat.remote.address").toString();
-            }
         }
         return request.getRemoteAddr();
+    }
+
+    /**
+     * A forwarded header is attacker controlled unless the deployment declares that the app
+     * runs behind a reverse proxy ({@code server.forward-headers-strategy} other than
+     * {@code none}). When it is trusted, the peer address has already been rewritten by the
+     * container, so the remote address stays the fallback.
+     */
+    private boolean trustsForwardedHeaders() {
+        return forwardHeadersStrategy != null
+                && !forwardHeadersStrategy.isBlank()
+                && !"none".equalsIgnoreCase(forwardHeadersStrategy);
     }
 
     private static final class Window {
